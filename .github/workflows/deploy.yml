@@ -11,7 +11,7 @@ permissions:
   id-token: write
 
 concurrency:
-  group: "pages"
+  group: pages
   cancel-in-progress: false
 
 jobs:
@@ -35,12 +35,3 @@ jobs:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
-```
-
-**4.** Click the green **"Commit changes"** button (top right) → **Commit changes**
-
----
-
-This will immediately trigger the deployment. Wait 1–2 minutes then visit:
-```
-https://nesansatya.github.io/workdesk/
