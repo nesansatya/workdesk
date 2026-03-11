@@ -1,0 +1,29 @@
+{
+  "name": "WorkDesk — Smart Reminders",
+  "short_name": "WorkDesk",
+  "description": "AI-powered reminder and task manager for tax executives",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#09090e",
+  "theme_color": "#09090e",
+  "lang": "en-MY",
+  "categories": ["productivity", "business"],
+  "icons": [
+    {
+      "src": "icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "screenshots": [],
+  "prefer_related_applications": false
+}
