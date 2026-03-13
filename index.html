@@ -395,11 +395,7 @@ function App(){
   const [notifGranted,setNotifGranted]= useState(false);
 
   useEffect(()=>{const t=setInterval(()=>setNow(new Date()),30000);return()=>clearInterval(t);},[]);
-  useEffect(()=>{
-    const on=()=>setIsOnline(true),off=()=>setIsOnline(false);
-    window.addEventListener("online",on);window.addEventListener("offline",off);
-    return()=>{window.removeEventListener("online",on);window.removeEventListener("offline",off);};
-  },[]);
+
   useEffect(()=>{try{localStorage.setItem("wd_tasks",   JSON.stringify(tasks));}catch{}},[tasks]);
   useEffect(()=>{try{localStorage.setItem("wd_clients", JSON.stringify(clients));}catch{}},[clients]);
   useEffect(()=>{try{localStorage.setItem("wd_renewals",JSON.stringify(renewals));}catch{}},[renewals]);
@@ -504,7 +500,7 @@ function App(){
     catch{setSuggestions([]);}setAiLoading(false);
   };
   const addSuggested=s=>{setTasks(ts=>[...ts,{...s,id:uid(),done:false,clientId:"",time:""}]);setSuggestions(ss=>ss.filter(x=>x!==s));};
-  const openAI=(tab,cb)=>{setAiOpen(true);setAiTab(tab);if(cb)cb();};
+  const openAI=(tab,cb)=>{setAiOpen(true);setAiTab(tab);if(tab==="email")setEmailDraft("");if(cb)cb();};
 
   // PAGE CONTENT — shared between mobile and desktop
   const pageContent = (
@@ -535,7 +531,7 @@ function App(){
           <div style={{background:"linear-gradient(135deg,#0d0c1e,#080e18)",border:"1px solid #181830",borderRadius:14,padding:"12px 14px",marginBottom:16}}>
             <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:10}}>
               <span style={{background:"linear-gradient(135deg,#2a1f5a,#1a3a5a)",border:"1px solid #3a2a7a",borderRadius:12,padding:"2px 8px",fontSize:10,color:"#a090ff",fontWeight:700}}>✦ AI</span>
-              <span style={{fontSize:12,color:isOnline?"var(--text3)":"#6b5010"}}>{isOnline?"Personalised for your workflow":"Offline — AI paused"}</span>
+              <span style={{fontSize:12,color:"var(--text3)"}}>Personalised for your workflow</span>
             </div>
             <div className="qa-grid">
               <button className="qa-btn" onClick={()=>openAI("briefing",genBriefing)}><span className="qa-icon">📋</span><span className="qa-label">Daily Brief</span></button>
@@ -1072,7 +1068,7 @@ const activeRens=renewals.filter(r=>r.status!=="done"&&r.status!=="archived");
               <div style={{display:"flex",alignItems:"center",gap:7}}>
                 <span style={{background:"linear-gradient(135deg,#2a1f5a,#1a3a5a)",border:"1px solid #3a2a7a",borderRadius:12,padding:"2px 8px",fontSize:10,color:"#a090ff",fontWeight:700}}>✦ AI</span>
                 <span style={{fontFamily:"'Playfair Display',serif",fontSize:15,color:"#b8aaf8"}}>Assistant</span>
-                {!isOnline&&<span style={{fontSize:10,color:"#e8a838",background:"#1a1008",border:"1px solid #2a2008",borderRadius:10,padding:"1px 7px",fontWeight:600}}>Offline</span>}
+                
               </div>
               <button className="btn btn-ghost btn-sm" style={{padding:"5px 10px"}} onClick={()=>setAiOpen(false)}>✕</button>
             </div>
@@ -1095,8 +1091,8 @@ const activeRens=renewals.filter(r=>r.status!=="done"&&r.status!=="archived");
                     ))}
                   </div>
                   <div style={{padding:"10px 12px",borderTop:"1px solid #181828",display:"flex",gap:8,paddingBottom:"calc(10px + env(safe-area-inset-bottom))"}}>
-                    <input className="input" style={{fontSize:13.5,padding:"10px 12px"}} placeholder={isOnline?"Ask anything…":"Offline — AI paused"} value={chatInput} onChange={e=>setChatInput(e.target.value)} onKeyDown={e=>{if(e.key==="Enter"){e.preventDefault();sendChat();}}} disabled={!isOnline}/>
-                    <button className="btn btn-gold" style={{padding:"10px 14px",flexShrink:0}} onClick={sendChat} disabled={aiLoading||!isOnline}>↑</button>
+                    <input className="input" style={{fontSize:13.5,padding:"10px 12px"}} placeholder="Ask anything…" value={chatInput} onChange={e=>setChatInput(e.target.value)} onKeyDown={e=>{if(e.key==="Enter"){e.preventDefault();sendChat();}}}/>
+                    <button className="btn btn-gold" style={{padding:"10px 14px",flexShrink:0}} onClick={sendChat} disabled={aiLoading}>↑</button>
                   </div>
                 </>
               )}
