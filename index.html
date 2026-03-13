@@ -339,7 +339,7 @@ textarea.input{resize:none;min-height:76px;line-height:1.55;}
 
 /* ── DESKTOP PAGE HEADER ── */
 .page-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:22px;width:100%;box-sizing:border-box;overflow:hidden;}
-.fab{position:fixed;bottom:calc(max(env(safe-area-inset-bottom),16px) + 68px);right:16px;background:#e8c858;color:#0d0d10;border:none;border-radius:20px;padding:10px 20px;font-size:13px;font-weight:700;cursor:pointer;z-index:40;opacity:0.75;transition:opacity .3s;font-family:inherit;}
+.fab{position:fixed;bottom:calc(max(env(safe-area-inset-bottom),16px) + 68px);right:16px;background:#e8c858;color:#0d0d10;border:none;border-radius:20px;padding:10px 20px;font-size:13px;font-weight:700;cursor:pointer;z-index:40;opacity:0;pointer-events:none;transition:opacity .3s ease;font-family:inherit;}.fab.fab-visible{opacity:0.75;pointer-events:all;}
 @media(min-width:769px){.fab{display:none;}}
 .page-title{font-family:'Playfair Display',serif;font-size:24px;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-right:8px;}
 
