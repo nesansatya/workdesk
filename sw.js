@@ -1,7 +1,7 @@
 // WorkDesk Service Worker v3.0
 // Caches everything for full offline support
 
-const CACHE_NAME = "workdesk-v6";
+const CACHE_NAME = "workdesk-v8";
 const ASSETS = [
   "./",
   "./index.html",
