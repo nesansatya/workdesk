@@ -976,36 +976,35 @@ function ClientModal({onClose,onSave,isEdit,client}){
 }
 
 // SW registration
-// ── Block pull-to-refresh & overscroll in Android WebView ──────────────────
+// ── Block pull-to-refresh only, allow normal scrolling ─────────────────────
 (function() {
-  // Prevent default touch behavior on document to stop pull-to-refresh
+  let startY = 0;
+  document.addEventListener('touchstart', function(e) {
+    startY = e.touches[0].clientY;
+  }, { passive: true });
+
   document.addEventListener('touchmove', function(e) {
-    // Find the closest scrollable parent
+    const dy = e.touches[0].clientY - startY;
+    // Only block if pulling DOWN (dy > 0) and the touched element
+    // is not inside a scrollable container that still has room to scroll up
     let el = e.target;
-    let scrollable = null;
-    while (el && el !== document.body) {
+    while (el && el !== document.documentElement) {
       const style = window.getComputedStyle(el);
-      const overflow = style.overflowY;
-      if ((overflow === 'auto' || overflow === 'scroll') && el.scrollHeight > el.clientHeight) {
-        scrollable = el;
-        break;
+      const oy = style.overflowY;
+      const canScroll = (oy === 'auto' || oy === 'scroll') && el.scrollHeight > el.clientHeight;
+      if (canScroll) {
+        // Allow scroll inside a scrollable container
+        // Only block if at the very top and pulling down
+        if (dy > 0 && el.scrollTop <= 0) {
+          e.preventDefault();
+        }
+        return;
       }
       el = el.parentElement;
     }
-    if (!scrollable) {
-      // No scrollable parent — block entirely (prevents pull-to-refresh)
-      e.preventDefault();
-      return;
-    }
-    // At top of scrollable and pulling down — block
-    if (scrollable.scrollTop <= 0 && e.touches[0].clientY > (e._startY || 0)) {
-      e.preventDefault();
-    }
+    // Not inside any scrollable container — block pull-to-refresh
+    if (dy > 0) e.preventDefault();
   }, { passive: false });
-
-  document.addEventListener('touchstart', function(e) {
-    e._startY = e.touches[0].clientY;
-  }, { passive: true });
 })();
 
 if("serviceWorker" in navigator){
