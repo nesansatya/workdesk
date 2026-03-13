@@ -21,7 +21,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js" crossorigin></script>
   <style>
     *{box-sizing:border-box;margin:0;padding:0;}
-    html,body,#root{height:100%;overflow:hidden;background:#09090e;}
+    html,body,#root{height:100%;background:#09090e;}html,body{overflow:hidden;}
     body{-webkit-tap-highlight-color:transparent;}
   </style>
 </head>
@@ -159,7 +159,7 @@ html,body{height:100%;overflow:hidden;}
 ::-webkit-scrollbar-thumb{background:#2a2a3a;border-radius:4px;}
 
 /* ── APP SHELL ── */
-.app{display:flex;height:100vh;height:100dvh;background:var(--bg);color:var(--text);font-family:'DM Sans','Segoe UI',sans-serif;overflow:hidden;}
+.app{display:flex;height:100vh;height:100dvh;width:100vw;max-width:100%;background:var(--bg);color:var(--text);font-family:'DM Sans','Segoe UI',sans-serif;overflow:hidden;position:relative;}
 
 /* ── DESKTOP SIDEBAR ── */
 .sidebar{width:220px;flex-shrink:0;background:#0c0c14;border-right:1px solid var(--border);display:flex;flex-direction:column;padding:0;overflow:hidden;}
@@ -184,7 +184,7 @@ html,body{height:100%;overflow:hidden;}
 
 /* ── MOBILE LAYOUT ── */
 .mobile-topbar{display:none;flex-shrink:0;height:54px;padding:0 16px;padding-top:env(safe-area-inset-top);background:var(--bg);border-bottom:1px solid var(--border);align-items:center;justify-content:space-between;z-index:10;}
-.mobile-scroll{display:none;flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:14px 16px 80px;}
+.mobile-scroll{display:none;flex:1;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;padding:14px 16px 80px;width:100%;max-width:100vw;}
 .bottom-nav{display:none;position:fixed;bottom:0;left:0;right:0;background:#0d0d16;border-top:1px solid var(--border);padding:0 4px;padding-bottom:env(safe-area-inset-bottom);z-index:50;min-height:60px;}
 .tab-btn{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;border:none;background:none;color:var(--text3);cursor:pointer;padding:8px 2px;font-family:inherit;min-height:56px;-webkit-tap-highlight-color:transparent;}
 .tab-btn.active{color:var(--gold);}
@@ -193,6 +193,10 @@ html,body{height:100%;overflow:hidden;}
 
 /* ── RESPONSIVE BREAKPOINT ── */
 @media (max-width: 768px) {
+  .app{flex-direction:column !important;}
+  .mobile-topbar{display:flex !important;}
+  .mobile-scroll{display:block !important;overflow-x:hidden !important;width:100% !important;}
+  .bottom-nav{display:flex !important;}
   .sidebar{display:none !important;}
   .main-area{display:none !important;}
   .mobile-topbar{display:flex !important;}
@@ -330,7 +334,8 @@ function App(){
   const [clients,  setClients]  = useState(()=>load("wd_clients", DEFAULT_CLIENTS));
   const [renewals, setRenewals] = useState(()=>load("wd_renewals",DEFAULT_RENEWALS));
   const [workflow, setWorkflow] = useState(()=>load("wd_workflow",DEFAULT_WORKFLOW));
-  const [view,       setView]       = useState("home");
+  const [view, setView] = useState(()=>localStorage.getItem("wd_view")||"home");
+  const changeView = v => { setView(v); localStorage.setItem("wd_view", v); };
   const [now,        setNow]        = useState(new Date());
   const [filterCat,  setFilterCat]  = useState("all");
   const [isOnline,   setIsOnline]   = useState(navigator.onLine);
@@ -667,7 +672,7 @@ function App(){
         </div>
         <div className="sidebar-nav">
           {NAV_ITEMS.map(n=>(
-            <button key={n.key} className={`sidebar-item${view===n.key?" active":""}`} onClick={()=>setView(n.key)}>
+            <button key={n.key} className={`sidebar-item${view===n.key?" active":""}`} onClick={()=>changeView(n.key)}>
               <span className="nav-icon">{n.icon}</span>
               {n.label}
             </button>
@@ -721,7 +726,7 @@ function App(){
 
       <nav className="bottom-nav">
         {NAV_ITEMS.map(n=>(
-          <button key={n.key} className={`tab-btn${view===n.key?" active":""}`} onClick={()=>setView(n.key)}>
+          <button key={n.key} className={`tab-btn${view===n.key?" active":""}`} onClick={()=>changeView(n.key)}>
             <span className="tab-icon">{n.icon}</span>
             <span className="tab-label">{n.label}</span>
           </button>
