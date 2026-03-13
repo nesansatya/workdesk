@@ -976,34 +976,45 @@ function ClientModal({onClose,onSave,isEdit,client}){
 }
 
 // SW registration
-// ── Block pull-to-refresh only, allow normal scrolling ─────────────────────
+// ── Block pull-to-refresh, allow all scrolling ─────────────────────────────
 (function() {
   let startY = 0;
+  let startScrollTop = 0;
+  let scrollEl = null;
+
   document.addEventListener('touchstart', function(e) {
     startY = e.touches[0].clientY;
-  }, { passive: true });
-
-  document.addEventListener('touchmove', function(e) {
-    const dy = e.touches[0].clientY - startY;
-    // Only block if pulling DOWN (dy > 0) and the touched element
-    // is not inside a scrollable container that still has room to scroll up
+    scrollEl = null;
+    startScrollTop = 0;
+    // Find the scrollable container being touched
     let el = e.target;
     while (el && el !== document.documentElement) {
-      const style = window.getComputedStyle(el);
-      const oy = style.overflowY;
-      const canScroll = (oy === 'auto' || oy === 'scroll') && el.scrollHeight > el.clientHeight;
-      if (canScroll) {
-        // Allow scroll inside a scrollable container
-        // Only block if at the very top and pulling down
-        if (dy > 0 && el.scrollTop <= 0) {
-          e.preventDefault();
-        }
-        return;
+      const oy = window.getComputedStyle(el).overflowY;
+      if ((oy === 'auto' || oy === 'scroll') && el.scrollHeight > el.clientHeight) {
+        scrollEl = el;
+        startScrollTop = el.scrollTop;
+        break;
       }
       el = el.parentElement;
     }
-    // Not inside any scrollable container — block pull-to-refresh
-    if (dy > 0) e.preventDefault();
+  }, { passive: true });
+
+  document.addEventListener('touchmove', function(e) {
+    const dy = e.touches[0].clientY - startY; // positive = finger moving down
+
+    if (scrollEl) {
+      // Inside a scrollable container:
+      // block ONLY when: finger moving down AND already scrolled to very top
+      // this is the pull-to-refresh gesture
+      if (dy > 0 && startScrollTop <= 0 && scrollEl.scrollTop <= 0) {
+        e.preventDefault();
+      }
+      // all other moves (scroll up = finger down with content, scroll down = finger up)
+      // are allowed naturally
+    } else {
+      // Not in any scrollable area — block all to prevent page-level refresh
+      e.preventDefault();
+    }
   }, { passive: false });
 })();
 
