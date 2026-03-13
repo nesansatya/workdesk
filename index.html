@@ -8,6 +8,8 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="WorkDesk" />
   <meta name="mobile-web-app-capable" content="yes" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+  <meta name="HandheldFriendly" content="true" />
   <meta name="description" content="WorkDesk — Smart reminder & AI assistant" />
   <title>WorkDesk</title>
   <link rel="manifest" href="manifest.json" />
@@ -21,13 +23,30 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js" crossorigin></script>
   <style>
     *{box-sizing:border-box;margin:0;padding:0;}
-    html,body,#root{height:100%;background:#09090e;}html,body{overflow:hidden;}
-    body{-webkit-tap-highlight-color:transparent;}
+    html{height:100%;height:calc(var(--vh,1vh)*100);}body,#root{height:100%;background:#09090e;}
+    html,body{overflow:hidden;}
+    html{overscroll-behavior:none;}
+    body{
+      -webkit-tap-highlight-color:transparent;
+      max-width:100vw;
+      overscroll-behavior:none;
+      overscroll-behavior-y:none;
+    }
   </style>
 </head>
 <body>
+  <script>
+    // Fix 100vh in Android WebView — sets --vh to actual visible height
+    function setVH() {
+      var vh = window.innerHeight * 0.01;
+      document.documentElement.style.setProperty('--vh', vh + 'px');
+    }
+    setVH();
+    window.addEventListener('resize', setVH);
+    window.addEventListener('orientationchange', function(){ setTimeout(setVH, 200); });
+  </script>
   <div id="root">
-    <div style="height:100vh;background:#09090e;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;">
+    <div style="height:calc(var(--vh,1vh)*100);background:#09090e;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;">
       <div style="width:64px;height:64px;background:linear-gradient(135deg,#e8c858,#a07818);border-radius:18px;display:flex;align-items:center;justify-content:center;font-size:32px;">⚡</div>
       <div style="font-family:serif;font-size:26px;color:#e8c858;">WorkDesk</div>
       <style>@keyframes sl{0%{transform:translateX(-100%)}100%{transform:translateX(350%)}}</style>
@@ -159,7 +178,7 @@ html,body{height:100%;overflow:hidden;}
 ::-webkit-scrollbar-thumb{background:#2a2a3a;border-radius:4px;}
 
 /* ── APP SHELL ── */
-.app{display:flex;height:100vh;height:100dvh;width:100vw;max-width:100%;background:var(--bg);color:var(--text);font-family:'DM Sans','Segoe UI',sans-serif;overflow:hidden;position:relative;}
+.app{display:flex;height:100vh;height:calc(var(--vh,1vh)*100);width:100vw;max-width:100%;background:var(--bg);color:var(--text);font-family:'DM Sans','Segoe UI',sans-serif;overflow:hidden;position:relative;overscroll-behavior:none;}
 
 /* ── DESKTOP SIDEBAR ── */
 .sidebar{width:220px;flex-shrink:0;background:#0c0c14;border-right:1px solid var(--border);display:flex;flex-direction:column;padding:0;overflow:hidden;}
@@ -180,12 +199,12 @@ html,body{height:100%;overflow:hidden;}
 .main-area{flex:1;display:flex;flex-direction:column;overflow:hidden;}
 .desktop-topbar{flex-shrink:0;height:56px;padding:0 24px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;background:var(--bg);}
 .desktop-topbar-title{font-family:'Playfair Display',serif;font-size:20px;color:var(--text);}
-.desktop-content{flex:1;overflow-y:auto;padding:24px;}
+.desktop-content{flex:1;overflow-y:auto;padding:24px;overscroll-behavior:contain;}
 
 /* ── MOBILE LAYOUT ── */
-.mobile-topbar{display:none;flex-shrink:0;height:54px;padding:0 16px;padding-top:env(safe-area-inset-top);background:var(--bg);border-bottom:1px solid var(--border);align-items:center;justify-content:space-between;z-index:10;}
-.mobile-scroll{display:none;flex:1;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;padding:14px 16px 80px;width:100%;max-width:100vw;}
-.bottom-nav{display:none;position:fixed;bottom:0;left:0;right:0;background:#0d0d16;border-top:1px solid var(--border);padding:0 4px;padding-bottom:env(safe-area-inset-bottom);z-index:50;min-height:60px;}
+.mobile-topbar{display:none;flex-shrink:0;min-height:54px;height:auto;padding:max(env(safe-area-inset-top),8px) 16px 8px;background:var(--bg);border-bottom:1px solid var(--border);align-items:center;justify-content:space-between;z-index:10;}
+.mobile-scroll{display:none;flex:1;overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;overscroll-behavior-y:contain;-webkit-overflow-scrolling:touch;padding:14px 16px 100px;width:100%;max-width:100vw;}
+.bottom-nav{display:none;position:fixed;bottom:0;left:0;right:0;background:#0d0d16;border-top:1px solid var(--border);padding:0 4px;padding-bottom:max(env(safe-area-inset-bottom),16px);z-index:50;min-height:60px;}
 .tab-btn{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;border:none;background:none;color:var(--text3);cursor:pointer;padding:8px 2px;font-family:inherit;min-height:56px;-webkit-tap-highlight-color:transparent;}
 .tab-btn.active{color:var(--gold);}
 .tab-btn .tab-icon{font-size:20px;line-height:1;}
@@ -957,6 +976,38 @@ function ClientModal({onClose,onSave,isEdit,client}){
 }
 
 // SW registration
+// ── Block pull-to-refresh & overscroll in Android WebView ──────────────────
+(function() {
+  // Prevent default touch behavior on document to stop pull-to-refresh
+  document.addEventListener('touchmove', function(e) {
+    // Find the closest scrollable parent
+    let el = e.target;
+    let scrollable = null;
+    while (el && el !== document.body) {
+      const style = window.getComputedStyle(el);
+      const overflow = style.overflowY;
+      if ((overflow === 'auto' || overflow === 'scroll') && el.scrollHeight > el.clientHeight) {
+        scrollable = el;
+        break;
+      }
+      el = el.parentElement;
+    }
+    if (!scrollable) {
+      // No scrollable parent — block entirely (prevents pull-to-refresh)
+      e.preventDefault();
+      return;
+    }
+    // At top of scrollable and pulling down — block
+    if (scrollable.scrollTop <= 0 && e.touches[0].clientY > (e._startY || 0)) {
+      e.preventDefault();
+    }
+  }, { passive: false });
+
+  document.addEventListener('touchstart', function(e) {
+    e._startY = e.touches[0].clientY;
+  }, { passive: true });
+})();
+
 if("serviceWorker" in navigator){
   window.addEventListener("load",()=>{
     navigator.serviceWorker.register("sw.js").catch(()=>{});
