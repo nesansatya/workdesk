@@ -407,39 +407,40 @@ function App(){
   useEffect(()=>{try{localStorage.setItem("wd_darkmode",JSON.stringify(darkMode));}catch{}},[darkMode]);
   useEffect(()=>{try{localStorage.setItem("wd_settings",JSON.stringify(settings));}catch{}},[settings]);
 
-  // Notification: check renewals + daily briefing
+  // In-app alerts on load
+  const [alerts, setAlerts] = React.useState([]);
+  const [shownAlerts, setShownAlerts] = React.useState(()=>load("wd_shown_alerts",[]));
   useEffect(()=>{
-    if(!("Notification" in window)||Notification.permission!=="granted")return;
-    const lastNotif=localStorage.getItem("wd_last_notif");
     const todayStr=new Date().toISOString().split("T")[0];
-    if(lastNotif===todayStr)return;
-    localStorage.setItem("wd_last_notif",todayStr);
-    // Renewal reminders
-    const urgent=renewals.filter(r=>r.status!=="done"&&daysUntil(r.renewalDate)<=7&&daysUntil(r.renewalDate)>=0);
-    urgent.forEach(r=>{
-      const cl=clients.find(c=>c.id===r.clientId);
+    const newAlerts=[];
+    // Renewal reminders — 7 days or less
+    renewals.filter(r=>r.status!=="done"&&r.status!=="archived").forEach(r=>{
       const d=daysUntil(r.renewalDate);
-      setTimeout(()=>{
-        new Notification("⚠️ Renewal Due Soon",{
-          body:`${r.service}${cl?" — "+cl.name:""} expires in ${d===0?"today":d+"d"} · RM ${r.billingAmount}`,
-          icon:"/workdesk/icons/icon-192.png"
-        });
-      },2000);
+      if(d<=7&&d>=0){
+        const key=`ren-${r.id}-${todayStr}`;
+        if(!shownAlerts.includes(key)){
+          const cl=clients.find(c=>c.id===r.clientId);
+          newAlerts.push({id:key,type:"warn",msg:`⚠️ ${r.service}${cl?" ("+cl.name+")":""} renews ${d===0?"today":d===1?"tomorrow":"in "+d+" days"} · RM ${r.billingAmount}`});
+        }
+      }
     });
-    // Daily briefing at 9am (show if between 9-10am)
+    // Daily briefing 9–10am
     const h=new Date().getHours();
-    if(h>=9&&h<10){
+    const briefKey=`brief-${todayStr}`;
+    if(h>=9&&h<10&&!shownAlerts.includes(briefKey)){
       const pending=tasks.filter(t=>!t.done).length;
       const overdue=tasks.filter(t=>!t.done&&t.dueDate<todayStr).length;
-      setTimeout(()=>{
-        new Notification("☀️ Good morning — WorkDesk",{
-          body:`${pending} tasks pending${overdue>0?`, ${overdue} overdue`:""}.${urgent.length>0?` ${urgent.length} renewal${urgent.length>1?"s":""} expiring soon.`:""}`,
-          icon:"/workdesk/icons/icon-192.png"
-        });
-      },3000);
+      const urgentCount=renewals.filter(r=>r.status!=="done"&&r.status!=="archived"&&daysUntil(r.renewalDate)<=7&&daysUntil(r.renewalDate)>=0).length;
+      newAlerts.unshift({id:briefKey,type:"brief",msg:`☀️ Good morning! ${pending} task${pending!==1?"s":""} pending${overdue>0?`, ${overdue} overdue`:""}${urgentCount>0?`, ${urgentCount} renewal${urgentCount>1?"s":""} due soon`:""}.`});
     }
-    setNotifGranted(Notification.permission==="granted");
+    if(newAlerts.length>0){
+      setAlerts(newAlerts);
+      const newShown=[...shownAlerts,...newAlerts.map(a=>a.id)];
+      setShownAlerts(newShown);
+      try{localStorage.setItem("wd_shown_alerts",JSON.stringify(newShown.slice(-50)));}catch{}
+    }
   },[]);
+  const dismissAlert=id=>setAlerts(a=>a.filter(x=>x.id!==id));
   useEffect(()=>{chatEndRef.current?.scrollIntoView({behavior:"smooth"});},[chatHistory,aiLoading]);
   useEffect(()=>{try{localStorage.setItem("wd_chat",JSON.stringify(chatHistory.slice(-40)));}catch{}},[chatHistory]);
 
@@ -928,18 +929,11 @@ const activeRens=renewals.filter(r=>r.status!=="done"&&r.status!=="archived");
           {/* Notifications */}
           <div className="card" style={{marginBottom:12}}>
             <div style={{fontSize:13,fontWeight:700,color:"var(--gold)",marginBottom:12}}>🔔 Notifications</div>
-            <div style={{fontSize:13,color:"var(--text3)",marginBottom:10,lineHeight:1.5}}>Enable push notifications to get renewal reminders 7 days before expiry and a daily briefing at 9am.</div>
-            <button className="btn btn-gold btn-full" onClick={()=>{
-              if(!("Notification" in window)){alert("Notifications not supported on this browser.");return;}
-              Notification.requestPermission().then(p=>{
-                setNotifGranted(p==="granted");
-                if(p==="granted"){
-                  new Notification("WorkDesk",{body:"Notifications enabled! You'll get renewal reminders and daily briefings.",icon:"/workdesk/icons/icon-192.png"});
-                }else{
-                  alert("Please enable notifications in your browser/app settings.");
-                }
-              });
-            }}>{notifGranted?"✓ Notifications Enabled":"Enable Notifications"}</button>
+            <div style={{fontSize:13,color:"var(--text3)",marginBottom:10,lineHeight:1.5}}>WorkDesk shows in-app alerts when renewals are due within 7 days, and a morning briefing between 9–10am when you open the app.</div>
+            <div style={{background:"#0a120a",border:"1px solid #1a2e1a",borderRadius:10,padding:"12px 14px",fontSize:13,color:"var(--green)"}}>
+              ✓ In-app alerts are always on — no setup needed.
+            </div>
+            <div style={{fontSize:12,color:"var(--text3)",marginTop:8,lineHeight:1.5}}>Alerts appear as banners at the top of the screen. Each alert shows once per day.</div>
           </div>
           {/* Data */}
           <div className="card" style={{marginBottom:12}}>
@@ -1007,6 +1001,12 @@ const activeRens=renewals.filter(r=>r.status!=="done"&&r.status!=="archived");
 
       <div className="main-area">
         {!isOnline&&<div className="offline-banner">📴 Offline — All data saved locally. AI features paused.</div>}
+        {alerts.map(a=>(
+          <div key={a.id} style={{padding:"9px 24px",background:a.type==="brief"?"#0a0e1a":"#1a0e0a",borderBottom:`1px solid ${a.type==="brief"?"#1a2a4a":"#3a1a0a"}`,display:"flex",alignItems:"center",gap:10}}>
+            <span style={{flex:1,fontSize:13,color:a.type==="brief"?"#a0c0ff":"#ffb060"}}>{a.msg}</span>
+            <button onClick={()=>dismissAlert(a.id)} style={{background:"none",border:"none",color:"#555",fontSize:16,cursor:"pointer",padding:"0 4px"}}>✕</button>
+          </div>
+        ))}
         <div className="desktop-topbar">
           <span className="desktop-topbar-title">{viewTitle}</span>
           <div style={{display:"flex",gap:8}}>
@@ -1036,6 +1036,12 @@ const activeRens=renewals.filter(r=>r.status!=="done"&&r.status!=="archived");
 
       <div className="mobile-scroll">
         {!isOnline&&<div className="offline-banner" style={{margin:"-14px -16px 14px",borderRadius:0}}>📴 Offline — AI paused</div>}
+        {alerts.map(a=>(
+          <div key={a.id} style={{margin:"-14px -16px 14px",padding:"11px 14px",background:a.type==="brief"?"#0a0e1a":"#1a0e0a",borderBottom:`1px solid ${a.type==="brief"?"#1a2a4a":"#3a1a0a"}`,display:"flex",alignItems:"flex-start",gap:10}}>
+            <span style={{flex:1,fontSize:12.5,color:a.type==="brief"?"#a0c0ff":"#ffb060",lineHeight:1.5}}>{a.msg}</span>
+            <button onClick={()=>dismissAlert(a.id)} style={{background:"none",border:"none",color:"#444",fontSize:16,cursor:"pointer",padding:"0 2px",flexShrink:0,lineHeight:1}}>✕</button>
+          </div>
+        ))}
         {pageContent}
       </div>
 
