@@ -338,7 +338,9 @@ textarea.input{resize:none;min-height:76px;line-height:1.55;}
 
 
 /* ── DESKTOP PAGE HEADER ── */
-.page-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;width:100%;box-sizing:border-box;overflow:hidden;position:sticky;top:0;z-index:20;background:#09090e;padding:12px 0 12px;border-bottom:1px solid #1e1e2e;}
+.page-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:22px;width:100%;box-sizing:border-box;overflow:hidden;}
+.fab{position:fixed;bottom:calc(max(env(safe-area-inset-bottom),16px) + 68px);right:16px;background:#e8c858;color:#0d0d10;border:none;border-radius:20px;padding:10px 20px;font-size:13px;font-weight:700;cursor:pointer;z-index:40;opacity:0.75;transition:opacity .3s;font-family:inherit;}
+@media(min-width:769px){.fab{display:none;}}
 .page-title{font-family:'Playfair Display',serif;font-size:24px;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-right:8px;}
 
 /* ── QA GRID ── */
@@ -560,8 +562,7 @@ function App(){
       {/* ═══ RENEWALS ═══ */}
       {view==="renewals"&&(
         <div>
-          <div style={{position:"sticky",top:0,zIndex:20,background:"#09090e"}}>
-          <div className="page-header" style={{position:"relative",top:"auto",borderBottom:"none",paddingBottom:0}}>
+          <div className="page-header">
             <h1 className="page-title">Renewals</h1>
             <button className="btn btn-gold btn-sm" onClick={()=>setShowAddRenewal(true)}>+ Add</button>
           </div>
@@ -572,7 +573,6 @@ function App(){
                 {lbl}{k==="done"&&renewals.filter(r=>r.status==="done").length>0?` (${renewals.filter(r=>r.status==="done").length})`:""}
               </button>
             ))}
-          </div>
           </div>
           <div className="renewals-grid">
             {renewals
@@ -788,6 +788,10 @@ function App(){
 
       {/* FAB — mobile only */}
 
+
+      {!aiOpen&&(view==="tasks"||view==="renewals"||view==="clients")&&(
+        <button className="fab" id="fab-add" onClick={()=>{if(view==="tasks")setShowAddTask(true);else if(view==="renewals")setShowAddRenewal(true);else setShowAddClient(true);}}>+ Add</button>
+      )}
 
       {/* ══ AI PANEL ══ */}
       {aiOpen&&(
