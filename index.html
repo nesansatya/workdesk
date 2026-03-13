@@ -1053,6 +1053,33 @@ function ClientModal({onClose,onSave,isEdit,client}){
   }, { passive: false });
 })();
 
+// FAB — show on scroll down, hide on scroll up ─────────────────────────────
+(function() {
+  let lastY = 0;
+  let attached = false;
+
+  function attachFabScroll() {
+    const scroller = document.querySelector('.mobile-scroll');
+    if (!scroller || attached) return;
+    attached = true;
+    scroller.addEventListener('scroll', function() {
+      const fab = document.getElementById('fab-add');
+      if (!fab) return;
+      const st = scroller.scrollTop;
+      if (st > lastY + 2) {
+        fab.classList.add('fab-visible');
+      } else if (st < lastY - 2) {
+        fab.classList.remove('fab-visible');
+      }
+      lastY = st;
+    }, { passive: true });
+  }
+
+  document.addEventListener('DOMContentLoaded', attachFabScroll);
+  setTimeout(attachFabScroll, 500);
+  setTimeout(attachFabScroll, 1500);
+})();
+
 if("serviceWorker" in navigator){
   window.addEventListener("load",()=>{
     navigator.serviceWorker.register("sw.js").catch(()=>{});
