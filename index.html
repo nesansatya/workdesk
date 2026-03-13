@@ -8,821 +8,950 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="WorkDesk" />
   <meta name="mobile-web-app-capable" content="yes" />
-  <meta name="description" content="WorkDesk — Smart reminder & AI assistant for tax executives" />
-
+  <meta name="description" content="WorkDesk — Smart reminder & AI assistant" />
   <title>WorkDesk</title>
-
-  <!-- PWA Manifest -->
   <link rel="manifest" href="manifest.json" />
-
-  <!-- Apple Touch Icons -->
   <link rel="apple-touch-icon" href="icons/icon-192.png" />
-  <link rel="apple-touch-icon" sizes="152x152" href="icons/icon-192.png" />
-  <link rel="apple-touch-icon" sizes="180x180" href="icons/icon-192.png" />
-  <link rel="apple-touch-startup-image" href="icons/icon-512.png" />
-
-  <!-- Favicon -->
   <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png" />
-  <link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512.png" />
-
-  <!-- Fonts (cached by SW for offline) -->
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=Playfair+Display:wght@500;600&display=swap" rel="stylesheet" />
-
-  <!-- React + Babel (loaded from CDN, cached by SW) -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js" crossorigin></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js" crossorigin></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js" crossorigin></script>
-
   <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    html, body, #root { height: 100%; height: 100dvh; overflow: hidden; background: #09090e; }
-    body { -webkit-tap-highlight-color: transparent; -webkit-touch-callout: none; }
+    *{box-sizing:border-box;margin:0;padding:0;}
+    html,body,#root{height:100%;overflow:hidden;background:#09090e;}
+    body{-webkit-tap-highlight-color:transparent;}
   </style>
 </head>
 <body>
   <div id="root">
-    <!-- Splash while React loads -->
-    <div style="height:100vh;height:100dvh;background:#09090e;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;">
+    <div style="height:100vh;background:#09090e;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;">
       <div style="width:64px;height:64px;background:linear-gradient(135deg,#e8c858,#a07818);border-radius:18px;display:flex;align-items:center;justify-content:center;font-size:32px;">⚡</div>
-      <div style="font-family:serif;font-size:26px;color:#e8c858;letter-spacing:-.01em;">WorkDesk</div>
-      <div style="width:40px;height:3px;background:#1a1a28;border-radius:3px;overflow:hidden;margin-top:8px;">
+      <div style="font-family:serif;font-size:26px;color:#e8c858;">WorkDesk</div>
+      <style>@keyframes sl{0%{transform:translateX(-100%)}100%{transform:translateX(350%)}}</style>
+      <div style="width:40px;height:3px;background:#1a1a28;border-radius:3px;overflow:hidden;">
         <div style="height:100%;width:40%;background:#e8c858;border-radius:3px;animation:sl 1.2s ease-in-out infinite;"></div>
       </div>
-      <style>@keyframes sl{0%{transform:translateX(-100%)}100%{transform:translateX(350%)}}</style>
     </div>
   </div>
 
-  <script type="text/babel">
-    const { useState, useEffect, useRef } = React;
+<script type="text/babel">
+const { useState, useEffect, useRef } = React;
 
-    // ─── Data ───────────────────────────────────────────────────────────────────
-    const DEFAULT_CLIENTS = [
-      { id: "c1", name: "Ahmad Razali",          type: "tax", email: "ahmad@example.com" },
-      { id: "c2", name: "Siti Holdings Sdn Bhd", type: "tax", email: "siti@example.com" },
-      { id: "c3", name: "Lee & Partners",        type: "web", email: "lee@example.com" },
-      { id: "c4", name: "Farah Boutique",        type: "web", email: "farah@example.com" },
-    ];
-    const DEFAULT_RENEWALS = [
-      { id: "r1", clientId: "c3", service: "GoDaddy Email Hosting",        cost: 180, billingAmount: 280, renewalDate: "2026-04-15", notes: "3 mailboxes",   status: "upcoming" },
-      { id: "r2", clientId: "c4", service: "MS Office 365 Business Basic", cost: 420, billingAmount: 600, renewalDate: "2026-03-25", notes: "5 licenses",    status: "upcoming" },
-      { id: "r3", clientId: "c3", service: "Domain Renewal (.com)",        cost: 45,  billingAmount: 85,  renewalDate: "2026-05-10", notes: "leepartners.com", status: "upcoming" },
-      { id: "r4", clientId: "c4", service: "Social Media Management",      cost: 0,   billingAmount: 800, renewalDate: "2026-04-01", notes: "Monthly retainer — IG + FB", status: "upcoming" },
-    ];
-    const DEFAULT_TASKS = [
-      { id: "t1", title: "File CP204 for Ahmad Razali",              category: "tax",    priority: "high",   dueDate: "2026-03-20", time: "10:00", clientId: "c1", notes: "Instalment payment form",    done: false },
-      { id: "t2", title: "Prepare audit docs — Siti Holdings",       category: "tax",    priority: "high",   dueDate: "2026-03-18", time: "14:00", clientId: "c2", notes: "FY2025 audit",              done: false },
-      { id: "t3", title: "Update Farah Boutique homepage",           category: "web",    priority: "medium", dueDate: "2026-03-15", time: "10:00", clientId: "c4", notes: "New product launch banner",  done: false },
-      { id: "t4", title: "Send renewal invoice — Lee & Partners",    category: "web",    priority: "high",   dueDate: "2026-04-01", time: "09:30", clientId: "c3", notes: "Bill RM280, due Apr 15",    done: false },
-      { id: "t5", title: "Post Instagram content — Farah Boutique",  category: "social", priority: "medium", dueDate: "2026-03-10", time: "11:00", clientId: "c4", notes: "3x posts this week",        done: false },
-      { id: "t6", title: "Tax CPD webinar registration",             category: "tax",    priority: "low",    dueDate: "2026-03-30", time: "09:00", clientId: "",   notes: "MIA CPE requirement",        done: false },
-    ];
-    const DEFAULT_WORKFLOW = {
-      morningRoutine:    "I start by checking emails at 9am, then review my task list. I prefer to tackle high-priority tax work in the morning when I'm most focused.",
-      workStyle:         "I work best in focused 90-minute blocks. I dislike being interrupted during deep tax work. I prefer to batch client emails in the afternoon after lunch.",
-      taxRoutine:        "Monthly: CP204 instalments for all clients by 10th. Quarterly: review audit files. Annually: CP8D, LHDN submissions.",
-      webRoutine:        "Web clients: I send renewal reminders 30 days before expiry. I always bill clients before renewing. Markup is typically 50–100% on hosting/domain.",
-      socialRoutine:     "Social media clients get weekly content calendars on Mondays. I batch-create content on Fridays.",
-      billingRoutine:    "I invoice on the 1st of every month for retainers. Ad-hoc work is invoiced within 3 days. Payment terms are 14 days.",
-      communicationStyle:"Professional but warm. English and Bahasa Malaysia. Concise — no more than 3 paragraphs. Follow up if no reply within 5 working days.",
-      priorities:        "Tax deadlines first. Then renewals expiring within 14 days. Then web design milestones. Social media is lowest priority.",
-      tools:             "GoDaddy for domain/email, Microsoft 365, Meta Business Suite for social, LHDN MyTax portal.",
-      notes:             "",
-    };
-    const WORKFLOW_FIELDS = [
-      { key: "morningRoutine",     label: "Morning Routine",       icon: "🌅" },
-      { key: "workStyle",          label: "Work Style & Focus",    icon: "🧠" },
-      { key: "taxRoutine",         label: "Tax Work Routine",      icon: "📋" },
-      { key: "webRoutine",         label: "Web Design Routine",    icon: "🌐" },
-      { key: "socialRoutine",      label: "Social Media Routine",  icon: "📱" },
-      { key: "billingRoutine",     label: "Billing & Invoicing",   icon: "💰" },
-      { key: "communicationStyle", label: "Communication Style",   icon: "✉️" },
-      { key: "priorities",         label: "Priority Rules",        icon: "🎯" },
-      { key: "tools",              label: "Tools & Platforms",     icon: "🔧" },
-      { key: "notes",              label: "Anything Else",         icon: "📝" },
-    ];
-    const CATEGORIES = {
-      tax:     { label: "Tax",     color: "#E8A838", bg: "#2A1F06", icon: "📋" },
-      web:     { label: "Web",     color: "#38C3E8", bg: "#061A2A", icon: "🌐" },
-      social:  { label: "Social",  color: "#E838A8", bg: "#2A0620", icon: "📱" },
-      billing: { label: "Billing", color: "#38E8A8", bg: "#062A1F", icon: "💰" },
-      admin:   { label: "Admin",   color: "#A8E838", bg: "#1A2A06", icon: "📁" },
-    };
-    const PRIORITIES = {
-      high:   { label: "High",   color: "#FF5757" },
-      medium: { label: "Medium", color: "#FFB547" },
-      low:    { label: "Low",    color: "#57FF9C" },
-    };
+// ─── Data ────────────────────────────────────────────────────────────────────
+const DEFAULT_CLIENTS = [
+  { id:"c1", name:"Ahmad Razali",          type:"tax", email:"ahmad@example.com" },
+  { id:"c2", name:"Siti Holdings Sdn Bhd", type:"tax", email:"siti@example.com" },
+  { id:"c3", name:"Lee & Partners",        type:"web", email:"lee@example.com" },
+  { id:"c4", name:"Farah Boutique",        type:"web", email:"farah@example.com" },
+];
+const DEFAULT_RENEWALS = [
+  { id:"r1", clientId:"c3", service:"GoDaddy Email Hosting",        cost:180, billingAmount:280, renewalDate:"2026-04-15", notes:"3 mailboxes",            status:"upcoming" },
+  { id:"r2", clientId:"c4", service:"MS Office 365 Business Basic", cost:420, billingAmount:600, renewalDate:"2026-03-25", notes:"5 licenses",             status:"upcoming" },
+  { id:"r3", clientId:"c3", service:"Domain Renewal (.com)",        cost:45,  billingAmount:85,  renewalDate:"2026-05-10", notes:"leepartners.com",        status:"upcoming" },
+  { id:"r4", clientId:"c4", service:"Social Media Management",      cost:0,   billingAmount:800, renewalDate:"2026-04-01", notes:"Monthly retainer IG+FB", status:"upcoming" },
+];
+const DEFAULT_TASKS = [
+  { id:"t1", title:"File CP204 for Ahmad Razali",             category:"tax",    priority:"high",   dueDate:"2026-03-20", time:"10:00", clientId:"c1", notes:"Instalment payment form",   done:false },
+  { id:"t2", title:"Prepare audit docs — Siti Holdings",      category:"tax",    priority:"high",   dueDate:"2026-03-18", time:"14:00", clientId:"c2", notes:"FY2025 audit",             done:false },
+  { id:"t3", title:"Update Farah Boutique homepage",          category:"web",    priority:"medium", dueDate:"2026-03-15", time:"10:00", clientId:"c4", notes:"New product launch banner", done:false },
+  { id:"t4", title:"Send renewal invoice — Lee & Partners",   category:"web",    priority:"high",   dueDate:"2026-04-01", time:"09:30", clientId:"c3", notes:"Bill RM280, due Apr 15",   done:false },
+  { id:"t5", title:"Post Instagram content — Farah Boutique", category:"social", priority:"medium", dueDate:"2026-03-10", time:"11:00", clientId:"c4", notes:"3x posts this week",       done:false },
+  { id:"t6", title:"Tax CPD webinar registration",            category:"tax",    priority:"low",    dueDate:"2026-03-30", time:"09:00", clientId:"",   notes:"MIA CPE requirement",      done:false },
+];
+const DEFAULT_WORKFLOW = {
+  morningRoutine:"I start by checking emails at 9am, then review my task list. I prefer to tackle high-priority tax work in the morning when I'm most focused.",
+  workStyle:"I work best in focused 90-minute blocks. I dislike being interrupted during deep tax work. I prefer to batch client emails in the afternoon after lunch.",
+  taxRoutine:"Monthly: CP204 instalments for all clients by 10th. Quarterly: review audit files. Annually: CP8D, LHDN submissions.",
+  webRoutine:"Web clients: I send renewal reminders 30 days before expiry. I always bill clients before renewing. Markup is typically 50–100% on hosting/domain.",
+  socialRoutine:"Social media clients get weekly content calendars on Mondays. I batch-create content on Fridays.",
+  billingRoutine:"I invoice on the 1st of every month for retainers. Ad-hoc work is invoiced within 3 days. Payment terms are 14 days.",
+  communicationStyle:"Professional but warm. English and Bahasa Malaysia. Concise — no more than 3 paragraphs.",
+  priorities:"Tax deadlines first. Then renewals expiring within 14 days. Then web design milestones. Social media is lowest priority.",
+  tools:"GoDaddy for domain/email, Microsoft 365, Meta Business Suite for social, LHDN MyTax portal.",
+  notes:"",
+};
+const WORKFLOW_FIELDS = [
+  { key:"morningRoutine",     label:"Morning Routine",      icon:"🌅" },
+  { key:"workStyle",          label:"Work Style & Focus",   icon:"🧠" },
+  { key:"taxRoutine",         label:"Tax Work Routine",     icon:"📋" },
+  { key:"webRoutine",         label:"Web Design Routine",   icon:"🌐" },
+  { key:"socialRoutine",      label:"Social Media Routine", icon:"📱" },
+  { key:"billingRoutine",     label:"Billing & Invoicing",  icon:"💰" },
+  { key:"communicationStyle", label:"Communication Style",  icon:"✉️" },
+  { key:"priorities",         label:"Priority Rules",       icon:"🎯" },
+  { key:"tools",              label:"Tools & Platforms",    icon:"🔧" },
+  { key:"notes",              label:"Anything Else",        icon:"📝" },
+];
+const CATEGORIES = {
+  tax:     { label:"Tax",     color:"#E8A838", bg:"#2A1F06", icon:"📋" },
+  web:     { label:"Web",     color:"#38C3E8", bg:"#061A2A", icon:"🌐" },
+  social:  { label:"Social",  color:"#E838A8", bg:"#2A0620", icon:"📱" },
+  billing: { label:"Billing", color:"#38E8A8", bg:"#062A1F", icon:"💰" },
+  admin:   { label:"Admin",   color:"#A8E838", bg:"#1A2A06", icon:"📁" },
+};
+const PRIORITIES = {
+  high:   { label:"High",   color:"#FF5757" },
+  medium: { label:"Medium", color:"#FFB547" },
+  low:    { label:"Low",    color:"#57FF9C" },
+};
+const NAV_ITEMS = [
+  { key:"home",     icon:"🏠", label:"Home" },
+  { key:"tasks",    icon:"✅", label:"Tasks" },
+  { key:"renewals", icon:"🔄", label:"Renewals" },
+  { key:"clients",  icon:"👥", label:"Clients" },
+  { key:"workflow", icon:"🧠", label:"Workflow" },
+];
 
-    // ─── Helpers ────────────────────────────────────────────────────────────────
-    const uid = () => Math.random().toString(36).slice(2, 10);
-    const fmtDate = (s) => s ? new Date(s+"T00:00:00").toLocaleDateString("en-MY",{day:"numeric",month:"short"}) : "";
-    const fmtDateFull = (s) => s ? new Date(s+"T00:00:00").toLocaleDateString("en-MY",{day:"numeric",month:"short",year:"numeric"}) : "";
-    function daysUntil(s){const t=new Date();t.setHours(0,0,0,0);return Math.ceil((new Date(s+"T00:00:00")-t)/86400000);}
-    function dayLabel(d){
-      if(d<0)  return{text:`${Math.abs(d)}d overdue`,color:"#FF5757"};
-      if(d===0)return{text:"Today",color:"#FF5757"};
-      if(d===1)return{text:"Tomorrow",color:"#FFB547"};
-      if(d<=7) return{text:`${d}d left`,color:"#FFB547"};
-      if(d<=30)return{text:`${d}d left`,color:"#57FF9C"};
-      return{text:`${d}d left`,color:"#666"};
-    }
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+const uid = () => Math.random().toString(36).slice(2,10);
+const fmtDate = s => s ? new Date(s+"T00:00:00").toLocaleDateString("en-MY",{day:"numeric",month:"short"}) : "";
+const fmtDateFull = s => s ? new Date(s+"T00:00:00").toLocaleDateString("en-MY",{day:"numeric",month:"short",year:"numeric"}) : "";
+function daysUntil(s){const t=new Date();t.setHours(0,0,0,0);return Math.ceil((new Date(s+"T00:00:00")-t)/86400000);}
+function dayLabel(d){
+  if(d<0)  return{text:`${Math.abs(d)}d overdue`,color:"#FF5757"};
+  if(d===0)return{text:"Today",color:"#FF5757"};
+  if(d===1)return{text:"Tomorrow",color:"#FFB547"};
+  if(d<=7) return{text:`${d}d left`,color:"#FFB547"};
+  if(d<=30)return{text:`${d}d left`,color:"#57FF9C"};
+  return{text:`${d}d left`,color:"#666"};
+}
 
-    // ─── AI ─────────────────────────────────────────────────────────────────────
-    async function callClaude(messages, system="") {
-      const res = await fetch("https://api.anthropic.com/v1/messages", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ model: "claude-sonnet-4-20250514", max_tokens: 1200, system, messages }),
-      });
-      if (!res.ok) throw new Error("API error");
-      const data = await res.json();
-      return data.content?.map(b => b.text||"").join("") || "No response.";
-    }
-    function buildSystemPrompt(tasks, clients, renewals, workflow) {
-      const today = new Date().toISOString().split("T")[0];
-      const wf = WORKFLOW_FIELDS.filter(f=>workflow[f.key]?.trim()).map(f=>`${f.icon} ${f.label}:\n${workflow[f.key]}`).join("\n\n");
-      return `You are a personalised AI work assistant for a Malaysian Senior Tax Executive who also runs a web design side business. Adapt ALL responses to their workflow.
+// ─── AI ──────────────────────────────────────────────────────────────────────
+async function callClaude(messages,system=""){
+  const res=await fetch("https://api.anthropic.com/v1/messages",{
+    method:"POST",headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:1200,system,messages}),
+  });
+  if(!res.ok)throw new Error("API error");
+  const data=await res.json();
+  return data.content?.map(b=>b.text||"").join("")||"No response.";
+}
+function buildSystemPrompt(tasks,clients,renewals,workflow){
+  const today=new Date().toISOString().split("T")[0];
+  const wf=WORKFLOW_FIELDS.filter(f=>workflow[f.key]?.trim()).map(f=>`${f.icon} ${f.label}:\n${workflow[f.key]}`).join("\n\n");
+  return `You are a personalised AI work assistant for a Malaysian Senior Tax Executive who also runs a web design side business.
 TODAY: ${today}
 WORKFLOW PROFILE:\n${wf||"Not set yet."}
 CLIENTS:\n${clients.map(c=>`• ${c.name} (${c.type==="tax"?"Tax":"Web"}, ${c.email})`).join("\n")}
-PENDING TASKS:\n${tasks.filter(t=>!t.done).map(t=>{const c=clients.find(x=>x.id===t.clientId);const d=daysUntil(t.dueDate);return`• [${t.priority.toUpperCase()}] ${t.title} | ${t.dueDate} (${d>=0?d+"d left":Math.abs(d)+"d OVERDUE"}) | ${t.category}${c?" | "+c.name:""}${t.notes?" | "+t.notes:""}`;}).join("\n")}
+PENDING TASKS:\n${tasks.filter(t=>!t.done).map(t=>{const c=clients.find(x=>x.id===t.clientId);const d=daysUntil(t.dueDate);return`• [${t.priority.toUpperCase()}] ${t.title} | ${t.dueDate} (${d>=0?d+"d left":Math.abs(d)+"d OVERDUE"}) | ${t.category}${c?" | "+c.name:""}`;}).join("\n")}
 RENEWALS:\n${renewals.filter(r=>r.status!=="done").map(r=>{const c=clients.find(x=>x.id===r.clientId);const d=daysUntil(r.renewalDate);return`• ${r.service} for ${c?.name||"?"} | ${r.renewalDate} (${d}d) | Bill: RM${r.billingAmount} | Profit: RM${r.billingAmount-r.cost}`;}).join("\n")}
 Office hours: 9am–6pm, lunch 1–2pm. Currency: RM. Be concise and practical.`;
-    }
+}
 
-    // ─── CSS ────────────────────────────────────────────────────────────────────
-    const CSS = `
-    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
-    html,body{height:100%;height:100dvh;overflow:hidden;}
-    ::-webkit-scrollbar{display:none;}
-    .app{display:flex;flex-direction:column;height:100vh;height:100dvh;background:#09090e;color:#ddd8f4;font-family:'DM Sans','Segoe UI',sans-serif;overflow:hidden;}
-    .topbar{flex-shrink:0;padding:0 16px;height:54px;padding-top:env(safe-area-inset-top);display:flex;align-items:center;justify-content:space-between;background:#09090e;border-bottom:1px solid #14141e;position:relative;z-index:10;}
-    .scroll-area{flex:1;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;padding:14px 16px 90px;}
-    .bottom-nav{position:fixed;bottom:0;left:0;right:0;background:#0d0d16;border-top:1px solid #18182a;display:flex;align-items:center;padding:0 4px;padding-bottom:env(safe-area-inset-bottom);z-index:50;min-height:60px;}
-    .tab-btn{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;border:none;background:none;color:#555;cursor:pointer;padding:8px 2px;transition:color .2s;font-family:inherit;min-height:56px;}
-    .tab-btn.active{color:#e8c858;}
-    .tab-btn .tab-icon{font-size:20px;line-height:1;}
-    .tab-btn .tab-label{font-size:10px;font-weight:600;letter-spacing:.02em;}
-    .card{background:#111118;border:1px solid #1c1c28;border-radius:14px;padding:14px;margin-bottom:10px;}
-    .card-sm{background:#111118;border:1px solid #1c1c28;border-radius:12px;padding:12px 13px;margin-bottom:8px;}
-    .stat-row{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px;}
-    .stat-card{background:#111118;border:1px solid #1c1c28;border-radius:14px;padding:14px;}
-    .btn{border:none;cursor:pointer;border-radius:10px;font-size:14px;font-weight:600;padding:11px 16px;font-family:inherit;transition:all .15s;display:inline-flex;align-items:center;justify-content:center;gap:6px;-webkit-tap-highlight-color:transparent;}
-    .btn-gold{background:#e8c858;color:#0d0d10;}.btn-gold:active{opacity:.85;}
-    .btn-ghost{background:#161620;color:#888;border:1px solid #1e1e2c;}.btn-ghost:active{background:#1c1c2a;}
-    .btn-red{background:#1c1018;color:#ff7070;border:1px solid #2c1822;}
-    .btn-ai{background:linear-gradient(135deg,#1c1440,#0e2840);color:#9888f0;border:1px solid #2c2060;font-size:13px;padding:9px 14px;}
-    .btn-full{width:100%;}
-    .btn-sm{font-size:13px;padding:8px 12px;}
-    .input{background:#0c0c14;border:1px solid #1c1c2c;border-radius:10px;padding:12px 14px;color:#e0dcf4;font-size:15px;font-family:inherit;width:100%;-webkit-appearance:none;outline:none;}
-    .input:focus{border-color:#e8c858;}
-    .select{background:#0c0c14;border:1px solid #1c1c2c;border-radius:10px;padding:12px 14px;color:#e0dcf4;font-size:15px;font-family:inherit;width:100%;-webkit-appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23666' stroke-width='1.5' fill='none'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 14px center;outline:none;}
-    .select:focus{border-color:#e8c858;}
-    textarea.input{resize:none;min-height:80px;line-height:1.55;}
-    .lbl{font-size:11px;color:#484858;font-weight:700;margin-bottom:6px;letter-spacing:.07em;text-transform:uppercase;}
-    .pill{display:inline-flex;align-items:center;gap:3px;padding:3px 9px;border-radius:20px;font-size:11.5px;font-weight:600;}
-    .cb{width:24px;height:24px;border-radius:6px;border:2px solid #28283a;background:none;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .15s;}
-    .cb.on{background:#e8c858;border-color:#e8c858;}
-    .sheet-overlay{position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:200;}
-    .sheet{position:fixed;left:0;right:0;bottom:0;background:#0d0d16;border-radius:20px 20px 0 0;border-top:1px solid #1c1c2c;z-index:201;display:flex;flex-direction:column;transition:transform .35s cubic-bezier(.4,0,.2,1);max-height:90vh;max-height:90dvh;}
-    .sheet-handle{width:36px;height:4px;background:#2a2a3a;border-radius:4px;margin:10px auto 0;}
-    .sheet-tabs{display:flex;border-bottom:1px solid #181828;background:#09090e;}
-    .sheet-tab{flex:1;border:none;background:none;padding:12px 0;font-size:12px;font-weight:600;font-family:inherit;cursor:pointer;transition:all .2s;-webkit-tap-highlight-color:transparent;}
-    .ai-bubble{border-radius:12px;padding:12px 14px;font-size:14px;line-height:1.65;white-space:pre-wrap;word-break:break-word;}
-    .ai-bubble.user{background:#16162a;border:1px solid #22223a;color:#b0aacc;margin-left:20px;}
-    .ai-bubble.assistant{background:#121220;border:1px solid #1c1c2e;color:#ccd8d0;}
-    .typing-dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:#6858c8;animation:blink 1.2s infinite ease-in-out;}
-    .typing-dot:nth-child(2){animation-delay:.2s;}.typing-dot:nth-child(3){animation-delay:.4s;}
-    @keyframes blink{0%,80%,100%{opacity:.15;}40%{opacity:1;}}
-    .modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.88);z-index:300;display:flex;align-items:flex-end;}
-    .modal{background:#111118;border:1px solid #20203a;border-radius:20px 20px 0 0;padding:22px 18px;width:100%;max-height:92vh;max-height:92dvh;overflow-y:auto;padding-bottom:calc(22px + env(safe-area-inset-bottom));}
-    .modal-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;}
-    .sec-head{display:flex;align-items:center;gap:7px;margin-bottom:12px;}
-    .ren-cols{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin:10px 0;}
-    .ren-col{background:#08080d;border-radius:8px;padding:8px 10px;}
-    .wf-bar-bg{height:5px;background:#1a1a28;border-radius:5px;overflow:hidden;margin:8px 0;}
-    .wf-bar{height:100%;border-radius:5px;transition:width .4s;}
-    .qa-row{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px;}
-    .qa-btn{background:#111118;border:1px solid #1c1c28;border-radius:12px;padding:13px 10px;display:flex;flex-direction:column;align-items:center;gap:5px;cursor:pointer;transition:border-color .2s;-webkit-tap-highlight-color:transparent;}
-    .qa-btn:active{border-color:#e8c858;}
-    .qa-btn .qa-icon{font-size:22px;}
-    .qa-btn .qa-label{font-size:12px;font-weight:600;color:#888;}
-    .chips{display:flex;gap:6px;overflow-x:auto;padding-bottom:4px;margin-bottom:14px;-webkit-overflow-scrolling:touch;}
-    .chip{flex-shrink:0;border:1px solid #1e1e2c;border-radius:20px;padding:6px 13px;font-size:12.5px;font-weight:500;color:#555;background:none;cursor:pointer;white-space:nowrap;font-family:inherit;}
-    .chip.active{border-color:#e8c858;color:#e8c858;background:#1a1a28;}
-    .wf-card{background:#0e0e18;border:1px solid #1a1a2a;border-radius:12px;padding:14px;margin-bottom:8px;}
-    .wf-card.filled{border-color:#1e2e1e;}
-    .offline-banner{background:#1a1008;border-bottom:1px solid #2a1808;padding:6px 16px;font-size:12px;color:#e8a838;text-align:center;font-weight:600;}
-    `;
+// ─── CSS ─────────────────────────────────────────────────────────────────────
+const CSS = `
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+html,body{height:100%;overflow:hidden;}
+:root{
+  --bg:#09090e; --bg2:#111118; --bg3:#161620;
+  --border:#1c1c28; --border2:#22223a;
+  --gold:#e8c858; --gold-dim:#a07818;
+  --text:#ddd8f4; --text2:#888; --text3:#555;
+  --red:#ff5757; --green:#57ff9c; --blue:#38c3e8;
+  --ai:#6858c8; --ai-light:#9888f0;
+  --radius:12px; --radius-lg:16px;
+}
+::-webkit-scrollbar{width:4px;height:4px;}
+::-webkit-scrollbar-track{background:transparent;}
+::-webkit-scrollbar-thumb{background:#2a2a3a;border-radius:4px;}
 
-    // ─── Main App ───────────────────────────────────────────────────────────────
-    function App() {
-      const load=(k,def)=>{try{const s=localStorage.getItem(k);return s?JSON.parse(s):def;}catch{return def;}};
-      const [tasks,    setTasks]    = useState(()=>load("wdm_tasks",   DEFAULT_TASKS));
-      const [clients,  setClients]  = useState(()=>load("wdm_clients", DEFAULT_CLIENTS));
-      const [renewals, setRenewals] = useState(()=>load("wdm_renewals",DEFAULT_RENEWALS));
-      const [workflow, setWorkflow] = useState(()=>load("wdm_workflow",DEFAULT_WORKFLOW));
-      const [view,       setView]       = useState("home");
-      const [now,        setNow]        = useState(new Date());
-      const [filterCat,  setFilterCat]  = useState("all");
-      const [isOnline,   setIsOnline]   = useState(navigator.onLine);
-      const [showAddTask,    setShowAddTask]    = useState(false);
-      const [showAddRenewal, setShowAddRenewal] = useState(false);
-      const [showAddClient,  setShowAddClient]  = useState(false);
-      const [editTask,       setEditTask]       = useState(null);
-      const [aiOpen,      setAiOpen]      = useState(false);
-      const [aiTab,       setAiTab]       = useState("chat");
-      const [chatHistory, setChatHistory] = useState([{role:"assistant",content:"Hi! I'm your AI assistant. Ask me anything about your tasks, clients, or deadlines. 👋\n\n⚠️ Note: AI features require internet connection."}]);
-      const [chatInput,   setChatInput]   = useState("");
-      const [aiLoading,   setAiLoading]   = useState(false);
-      const [briefing,    setBriefing]    = useState("");
-      const [emailDraft,  setEmailDraft]  = useState("");
-      const [emailCtx,    setEmailCtx]    = useState({clientId:"",purpose:""});
-      const [suggestions, setSuggestions] = useState([]);
-      const chatEndRef = useRef(null);
-      const [wfEdits,    setWfEdits]    = useState({});
-      const [wfSaved,    setWfSaved]    = useState(false);
-      const [wfExpanded, setWfExpanded] = useState(null);
+/* ── APP SHELL ── */
+.app{display:flex;height:100vh;height:100dvh;background:var(--bg);color:var(--text);font-family:'DM Sans','Segoe UI',sans-serif;overflow:hidden;}
 
-      useEffect(()=>{const t=setInterval(()=>setNow(new Date()),30000);return()=>clearInterval(t);},[]);
-      useEffect(()=>{
-        const on=()=>setIsOnline(true);
-        const off=()=>setIsOnline(false);
-        window.addEventListener("online",on);
-        window.addEventListener("offline",off);
-        return()=>{window.removeEventListener("online",on);window.removeEventListener("offline",off);};
-      },[]);
-      useEffect(()=>{try{localStorage.setItem("wdm_tasks",   JSON.stringify(tasks));}catch{}},[tasks]);
-      useEffect(()=>{try{localStorage.setItem("wdm_clients", JSON.stringify(clients));}catch{}},[clients]);
-      useEffect(()=>{try{localStorage.setItem("wdm_renewals",JSON.stringify(renewals));}catch{}},[renewals]);
-      useEffect(()=>{try{localStorage.setItem("wdm_workflow",JSON.stringify(workflow));}catch{}},[workflow]);
-      useEffect(()=>{chatEndRef.current?.scrollIntoView({behavior:"smooth"});},[chatHistory,aiLoading]);
+/* ── DESKTOP SIDEBAR ── */
+.sidebar{width:220px;flex-shrink:0;background:#0c0c14;border-right:1px solid var(--border);display:flex;flex-direction:column;padding:0;overflow:hidden;}
+.sidebar-logo{padding:20px 18px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;}
+.sidebar-logo-icon{width:34px;height:34px;background:linear-gradient(135deg,#e8c858,#a07818);border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:17px;flex-shrink:0;}
+.sidebar-logo-text{font-family:'Playfair Display',serif;font-size:19px;color:var(--gold);}
+.sidebar-nav{flex:1;padding:12px 10px;display:flex;flex-direction:column;gap:3px;overflow-y:auto;}
+.sidebar-item{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:10px;cursor:pointer;border:none;background:none;color:var(--text2);font-size:14px;font-weight:500;font-family:inherit;width:100%;text-align:left;transition:all .18s;}
+.sidebar-item:hover{background:var(--bg3);color:var(--text);}
+.sidebar-item.active{background:linear-gradient(135deg,#1a1828,#12101e);color:var(--gold);border:1px solid #28243a;}
+.sidebar-item .nav-icon{font-size:17px;flex-shrink:0;}
+.sidebar-footer{padding:12px 10px;border-top:1px solid var(--border);}
+.sidebar-time{font-size:12px;color:var(--text3);padding:8px 12px;background:var(--bg2);border-radius:8px;text-align:center;}
+.sidebar-ai-btn{width:100%;margin-top:8px;background:linear-gradient(135deg,#1c1440,#0e2840);color:var(--ai-light);border:1px solid #2c2060;border-radius:10px;padding:10px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:6px;}
+.sidebar-ai-btn:hover{background:linear-gradient(135deg,#221850,#102e50);}
 
-      const today    = now.toISOString().split("T")[0];
-      const hour     = now.getHours();
-      const isOffice = hour>=9&&hour<18;
-      const isLunch  = hour>=13&&hour<14;
-      const greet    = hour<12?"Good morning":hour<18?"Good afternoon":"Good evening";
-      const todayTasks     = tasks.filter(t=>t.dueDate===today&&!t.done);
-      const overdueTasks   = tasks.filter(t=>t.dueDate<today&&!t.done);
-      const upcomingTasks  = tasks.filter(t=>t.dueDate>today&&!t.done).sort((a,b)=>a.dueDate.localeCompare(b.dueDate));
-      const urgentRenewals = renewals.filter(r=>daysUntil(r.renewalDate)<=30&&r.status!=="done");
-      const wfFilled = WORKFLOW_FIELDS.filter(f=>workflow[f.key]?.trim()).length;
-      const wfPct    = Math.round((wfFilled/WORKFLOW_FIELDS.length)*100);
-      const toggleDone  = (id)=>setTasks(ts=>ts.map(t=>t.id===id?{...t,done:!t.done}:t));
-      const deleteTask  = (id)=>setTasks(ts=>ts.filter(t=>t.id!==id));
-      const markRenDone = (id)=>setRenewals(rs=>rs.map(r=>r.id===id?{...r,status:"done"}:r));
-      const sys = buildSystemPrompt(tasks,clients,renewals,workflow);
-      const saveWorkflow=()=>{setWorkflow(w=>({...w,...wfEdits}));setWfEdits({});setWfSaved(true);setTimeout(()=>setWfSaved(false),2200);};
+/* ── DESKTOP MAIN ── */
+.main-area{flex:1;display:flex;flex-direction:column;overflow:hidden;}
+.desktop-topbar{flex-shrink:0;height:56px;padding:0 24px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;background:var(--bg);}
+.desktop-topbar-title{font-family:'Playfair Display',serif;font-size:20px;color:var(--text);}
+.desktop-content{flex:1;overflow-y:auto;padding:24px;}
 
-      const sendChat=async()=>{
-        if(!chatInput.trim()||aiLoading)return;
-        if(!isOnline){setChatHistory(h=>[...h,{role:"user",content:chatInput},{role:"assistant",content:"⚠️ You're offline. AI features require an internet connection. Your tasks and data are still available!"}]);setChatInput("");return;}
-        const userMsg={role:"user",content:chatInput.trim()};
-        const newHist=[...chatHistory,userMsg];
-        setChatHistory(newHist);setChatInput("");setAiLoading(true);
-        try{const r=await callClaude(newHist.map(m=>({role:m.role,content:m.content})),sys);setChatHistory(h=>[...h,{role:"assistant",content:r}]);}
-        catch{setChatHistory(h=>[...h,{role:"assistant",content:"Connection error. Please check your internet and try again."}]);}
-        setAiLoading(false);
-      };
-      const genBriefing=async()=>{
-        if(!isOnline){setBriefing("⚠️ You're offline. Daily briefing requires internet connection.");return;}
-        setAiLoading(true);setBriefing("");
-        try{const r=await callClaude([{role:"user",content:`Generate my personalised daily briefing for today (${today}). Include: priority actions, overdue items, renewals this month, and a time-blocked schedule for 9am–6pm (skip 1–2pm lunch). Be specific and concise.`}],sys);setBriefing(r);}
-        catch{setBriefing("Failed to connect. Check your internet and try again.");}
-        setAiLoading(false);
-      };
-      const genEmail=async()=>{
-        if(!emailCtx.clientId||!emailCtx.purpose)return;
-        if(!isOnline){setEmailDraft("⚠️ You're offline. Email drafting requires internet connection.");return;}
-        const cl=clients.find(c=>c.id===emailCtx.clientId);
-        setAiLoading(true);setEmailDraft("");
-        try{const r=await callClaude([{role:"user",content:`Draft a professional email to ${cl.name} (${cl.email}) for: "${emailCtx.purpose}". Match my communication style from my workflow profile. Include subject line. Keep concise.`}],sys);setEmailDraft(r);}
-        catch{setEmailDraft("Connection error. Try again.");}
-        setAiLoading(false);
-      };
-      const genSuggestions=async()=>{
-        if(!isOnline){setSuggestions([]);return;}
-        setAiLoading(true);setSuggestions([]);
-        try{const r=await callClaude([{role:"user",content:`Suggest 5 tasks I should add based on my workflow routines and current tasks. Return ONLY JSON array: [{"title":"...","category":"tax|web|social|billing|admin","priority":"high|medium|low","dueDate":"YYYY-MM-DD","notes":"...","reason":"..."}]. Today is ${today}.`}],sys);
-          setSuggestions(JSON.parse(r.replace(/```json|```/g,"").trim()));}
-        catch{setSuggestions([]);}
-        setAiLoading(false);
-      };
-      const addSuggested=(s)=>{setTasks(ts=>[...ts,{...s,id:uid(),done:false,clientId:"",time:""}]);setSuggestions(ss=>ss.filter(x=>x!==s));};
-      const openAI=(tab,cb)=>{setAiOpen(true);setAiTab(tab);if(cb)cb();};
-      const filteredTasks=tasks.filter(t=>{
-        if(filterCat==="all")return true;
-        if(filterCat==="done")return t.done;
-        return t.category===filterCat&&!t.done;
-      }).sort((a,b)=>{if(a.done!==b.done)return a.done?1:-1;return a.dueDate.localeCompare(b.dueDate);});
+/* ── MOBILE LAYOUT ── */
+.mobile-topbar{display:none;flex-shrink:0;height:54px;padding:0 16px;padding-top:env(safe-area-inset-top);background:var(--bg);border-bottom:1px solid var(--border);align-items:center;justify-content:space-between;z-index:10;}
+.mobile-scroll{display:none;flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:14px 16px 80px;}
+.bottom-nav{display:none;position:fixed;bottom:0;left:0;right:0;background:#0d0d16;border-top:1px solid var(--border);padding:0 4px;padding-bottom:env(safe-area-inset-bottom);z-index:50;min-height:60px;}
+.tab-btn{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;border:none;background:none;color:var(--text3);cursor:pointer;padding:8px 2px;font-family:inherit;min-height:56px;-webkit-tap-highlight-color:transparent;}
+.tab-btn.active{color:var(--gold);}
+.tab-btn .tab-icon{font-size:20px;line-height:1;}
+.tab-btn .tab-label{font-size:10px;font-weight:600;}
 
-      return (
-        <div className="app">
-          <style>{CSS}</style>
+/* ── RESPONSIVE BREAKPOINT ── */
+@media (max-width: 768px) {
+  .sidebar{display:none !important;}
+  .main-area{display:none !important;}
+  .mobile-topbar{display:flex !important;}
+  .mobile-scroll{display:block !important;}
+  .bottom-nav{display:flex !important;}
+}
+@media (min-width: 769px) {
+  .mobile-topbar{display:none !important;}
+  .mobile-scroll{display:none !important;}
+  .bottom-nav{display:none !important;}
+  .sidebar{display:flex !important;}
+  .main-area{display:flex !important;}
+}
 
-          {/* Offline banner */}
-          {!isOnline && <div className="offline-banner">📴 Offline — All data is saved locally. AI features paused.</div>}
+/* ── CARDS ── */
+.card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius-lg);padding:16px;margin-bottom:10px;}
+.card-sm{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:12px 14px;margin-bottom:8px;}
+.stat-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px;}
+.stat-card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius-lg);padding:16px;}
 
-          {/* TOP BAR */}
-          <div className="topbar">
-            <div style={{display:"flex",alignItems:"center",gap:8}}>
-              <div style={{width:30,height:30,background:"linear-gradient(135deg,#e8c858,#a07818)",borderRadius:8,display:"flex",alignItems:"center",justifyContent:"center",fontSize:15}}>⚡</div>
-              <span style={{fontFamily:"'Playfair Display',serif",fontSize:18,color:"#e8c858"}}>WorkDesk</span>
-            </div>
-            <div style={{display:"flex",alignItems:"center",gap:8}}>
-              <span style={{fontSize:12,color:isLunch?"#ffb547":isOffice?"#57ff9c":"#555",background:"#111",border:"1px solid #1a1a22",padding:"3px 9px",borderRadius:12,fontWeight:600}}>
-                {isLunch?"🍽":"🏢"} {now.toLocaleTimeString("en-MY",{hour:"2-digit",minute:"2-digit"})}
-              </span>
-              <button className="btn btn-ai" style={{padding:"7px 12px",fontSize:13,opacity:isOnline?1:.5}} onClick={()=>setAiOpen(o=>!o)}>✦ AI</button>
-            </div>
+/* Mobile stat grid: 2 cols */
+@media(max-width:768px){
+  .stat-grid{grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px;}
+  .stat-card{padding:14px;}
+}
+
+/* ── DASHBOARD GRID ── */
+.dash-grid{display:grid;grid-template-columns:1.5fr 1fr;gap:20px;}
+@media(max-width:768px){.dash-grid{display:block;}}
+
+/* ── RENEWALS GRID ── */
+.renewals-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+@media(max-width:768px){.renewals-grid{display:block;}}
+
+/* ── CLIENTS GRID ── */
+.clients-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;}
+@media(max-width:768px){.clients-grid{display:block;}}
+
+/* ── BUTTONS ── */
+.btn{border:none;cursor:pointer;border-radius:10px;font-size:14px;font-weight:600;padding:10px 16px;font-family:inherit;transition:all .15s;display:inline-flex;align-items:center;justify-content:center;gap:6px;-webkit-tap-highlight-color:transparent;}
+.btn-gold{background:var(--gold);color:#0d0d10;}.btn-gold:active{opacity:.85;}
+.btn-ghost{background:#161620;color:#888;border:1px solid #1e1e2c;}.btn-ghost:hover,.btn-ghost:active{background:#1c1c2a;}
+.btn-red{background:#1c1018;color:#ff7070;border:1px solid #2c1822;}
+.btn-ai{background:linear-gradient(135deg,#1c1440,#0e2840);color:var(--ai-light);border:1px solid #2c2060;}
+.btn-full{width:100%;}
+.btn-sm{font-size:12px;padding:7px 11px;}
+
+/* ── INPUTS ── */
+.input{background:#0c0c14;border:1px solid #1c1c2c;border-radius:10px;padding:11px 13px;color:var(--text);font-size:14px;font-family:inherit;width:100%;outline:none;}
+.input:focus{border-color:var(--gold);}
+.select{background:#0c0c14;border:1px solid #1c1c2c;border-radius:10px;padding:11px 13px;color:var(--text);font-size:14px;font-family:inherit;width:100%;outline:none;-webkit-appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23666' stroke-width='1.5' fill='none'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 13px center;}
+.select:focus{border-color:var(--gold);}
+textarea.input{resize:none;min-height:76px;line-height:1.55;}
+.lbl{font-size:11px;color:#484858;font-weight:700;margin-bottom:5px;letter-spacing:.07em;text-transform:uppercase;}
+.pill{display:inline-flex;align-items:center;gap:3px;padding:3px 9px;border-radius:20px;font-size:11px;font-weight:600;}
+
+/* ── CHECKBOX ── */
+.cb{width:22px;height:22px;border-radius:6px;border:2px solid #28283a;background:none;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .15s;}
+.cb.on{background:var(--gold);border-color:var(--gold);}
+
+/* ── SECTION HEADER ── */
+.sec-head{display:flex;align-items:center;gap:8px;margin-bottom:14px;}
+.sec-bar{width:3px;border-radius:2px;height:18px;}
+.sec-title{font-family:'Playfair Display',serif;font-size:17px;color:var(--text);}
+
+/* ── AI PANEL — desktop side panel, mobile bottom sheet ── */
+.ai-overlay{position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:200;}
+/* Desktop: right side panel */
+.ai-panel{position:fixed;top:0;right:0;bottom:0;width:400px;background:#0d0d16;border-left:1px solid var(--border2);z-index:201;display:flex;flex-direction:column;}
+/* Mobile: bottom sheet */
+@media(max-width:768px){
+  .ai-panel{top:auto;left:0;right:0;bottom:0;width:100%;height:88dvh;border-left:none;border-top:1px solid var(--border2);border-radius:20px 20px 0 0;}
+}
+.ai-handle{width:36px;height:4px;background:#2a2a3a;border-radius:4px;margin:10px auto 0;display:none;}
+@media(max-width:768px){.ai-handle{display:block;}}
+.ai-header{padding:14px 16px 0;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #181828;padding-bottom:10px;}
+.ai-tabs{display:flex;border-bottom:1px solid #181828;background:var(--bg);}
+.ai-tab{flex:1;border:none;background:none;padding:11px 0;font-size:12px;font-weight:600;font-family:inherit;cursor:pointer;}
+.ai-bubble{border-radius:12px;padding:12px 14px;font-size:13.5px;line-height:1.65;white-space:pre-wrap;word-break:break-word;}
+.ai-bubble.user{background:#16162a;border:1px solid #22223a;color:#b0aacc;margin-left:24px;}
+.ai-bubble.assistant{background:#121220;border:1px solid #1c1c2e;color:#ccd8d0;}
+.typing-dot{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--ai);animation:blink 1.2s infinite ease-in-out;}
+.typing-dot:nth-child(2){animation-delay:.2s;}.typing-dot:nth-child(3){animation-delay:.4s;}
+@keyframes blink{0%,80%,100%{opacity:.15;}40%{opacity:1;}}
+
+/* ── MODAL ── */
+.modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:300;display:flex;align-items:flex-end;justify-content:center;}
+@media(min-width:769px){.modal-bg{align-items:center;}}
+.modal{background:#111118;border:1px solid #20203a;width:100%;max-height:94dvh;overflow-y:auto;padding:22px 18px;padding-bottom:calc(22px + env(safe-area-inset-bottom));}
+.modal-border-mobile{border-radius:20px 20px 0 0;}
+@media(min-width:769px){
+  .modal{max-width:520px;border-radius:16px;padding:26px 24px;max-height:90vh;}
+  .modal-border-mobile{border-radius:16px;}
+}
+.modal-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;}
+
+/* ── CHIPS ── */
+.chips{display:flex;gap:6px;overflow-x:auto;padding-bottom:4px;margin-bottom:14px;-webkit-overflow-scrolling:touch;}
+.chip{flex-shrink:0;border:1px solid #1e1e2c;border-radius:20px;padding:6px 13px;font-size:12px;font-weight:500;color:var(--text3);background:none;cursor:pointer;white-space:nowrap;font-family:inherit;}
+.chip.active{border-color:var(--gold);color:var(--gold);background:#1a1a28;}
+
+/* ── RENEWAL COLS ── */
+.ren-cols{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin:10px 0;}
+.ren-col{background:#08080d;border-radius:8px;padding:8px 10px;}
+
+/* ── WORKFLOW ── */
+.wf-card{background:#0e0e18;border:1px solid #1a1a2a;border-radius:12px;padding:14px;margin-bottom:8px;}
+.wf-card.filled{border-color:#1e2e1e;}
+.wf-bar-bg{height:5px;background:#1a1a28;border-radius:5px;overflow:hidden;margin:8px 0;}
+.wf-bar{height:100%;border-radius:5px;transition:width .4s;}
+
+/* ── OFFLINE BANNER ── */
+.offline-banner{background:#1a1008;border-bottom:1px solid #2a1808;padding:5px 16px;font-size:12px;color:#e8a838;text-align:center;font-weight:600;flex-shrink:0;}
+
+/* ── FAB ── */
+.fab{position:fixed;bottom:76px;right:18px;width:52px;height:52px;border-radius:16px;background:var(--gold);color:#0d0d10;font-size:26px;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 20px rgba(232,200,88,.35);z-index:40;}
+@media(min-width:769px){.fab{display:none;}}
+
+/* ── DESKTOP PAGE HEADER ── */
+.page-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:22px;}
+.page-title{font-family:'Playfair Display',serif;font-size:24px;}
+
+/* ── QA GRID ── */
+.qa-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px;}
+.qa-btn{background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:14px 10px;display:flex;flex-direction:column;align-items:center;gap:5px;cursor:pointer;transition:border-color .2s;-webkit-tap-highlight-color:transparent;}
+.qa-btn:hover,.qa-btn:active{border-color:var(--gold);}
+.qa-btn .qa-icon{font-size:22px;}
+.qa-btn .qa-label{font-size:12px;font-weight:600;color:var(--text2);}
+`;
+
+// ─── Main App ─────────────────────────────────────────────────────────────────
+function App(){
+  const load=(k,d)=>{try{const s=localStorage.getItem(k);return s?JSON.parse(s):d;}catch{return d;}};
+  const [tasks,    setTasks]    = useState(()=>load("wd_tasks",   DEFAULT_TASKS));
+  const [clients,  setClients]  = useState(()=>load("wd_clients", DEFAULT_CLIENTS));
+  const [renewals, setRenewals] = useState(()=>load("wd_renewals",DEFAULT_RENEWALS));
+  const [workflow, setWorkflow] = useState(()=>load("wd_workflow",DEFAULT_WORKFLOW));
+  const [view,       setView]       = useState("home");
+  const [now,        setNow]        = useState(new Date());
+  const [filterCat,  setFilterCat]  = useState("all");
+  const [isOnline,   setIsOnline]   = useState(navigator.onLine);
+  const [showAddTask,    setShowAddTask]    = useState(false);
+  const [showAddRenewal, setShowAddRenewal] = useState(false);
+  const [showAddClient,  setShowAddClient]  = useState(false);
+  const [editTask,       setEditTask]       = useState(null);
+  const [aiOpen,      setAiOpen]    = useState(false);
+  const [aiTab,       setAiTab]     = useState("chat");
+  const [chatHistory, setChatHistory] = useState([{role:"assistant",content:"Hi! I'm your AI assistant. Ask me anything about your tasks, clients, or deadlines. 👋"}]);
+  const [chatInput,   setChatInput] = useState("");
+  const [aiLoading,   setAiLoading] = useState(false);
+  const [briefing,    setBriefing]  = useState("");
+  const [emailDraft,  setEmailDraft]= useState("");
+  const [emailCtx,    setEmailCtx]  = useState({clientId:"",purpose:""});
+  const [suggestions, setSuggestions] = useState([]);
+  const [wfEdits,    setWfEdits]   = useState({});
+  const [wfSaved,    setWfSaved]   = useState(false);
+  const [wfExpanded, setWfExpanded]= useState(null);
+  const chatEndRef = useRef(null);
+
+  useEffect(()=>{const t=setInterval(()=>setNow(new Date()),30000);return()=>clearInterval(t);},[]);
+  useEffect(()=>{
+    const on=()=>setIsOnline(true),off=()=>setIsOnline(false);
+    window.addEventListener("online",on);window.addEventListener("offline",off);
+    return()=>{window.removeEventListener("online",on);window.removeEventListener("offline",off);};
+  },[]);
+  useEffect(()=>{try{localStorage.setItem("wd_tasks",   JSON.stringify(tasks));}catch{}},[tasks]);
+  useEffect(()=>{try{localStorage.setItem("wd_clients", JSON.stringify(clients));}catch{}},[clients]);
+  useEffect(()=>{try{localStorage.setItem("wd_renewals",JSON.stringify(renewals));}catch{}},[renewals]);
+  useEffect(()=>{try{localStorage.setItem("wd_workflow",JSON.stringify(workflow));}catch{}},[workflow]);
+  useEffect(()=>{chatEndRef.current?.scrollIntoView({behavior:"smooth"});},[chatHistory,aiLoading]);
+
+  const today   = now.toISOString().split("T")[0];
+  const hour    = now.getHours();
+  const isOffice= hour>=9&&hour<18, isLunch=hour>=13&&hour<14;
+  const greet   = hour<12?"Good morning":hour<18?"Good afternoon":"Good evening";
+  const todayTasks    = tasks.filter(t=>t.dueDate===today&&!t.done);
+  const overdueTasks  = tasks.filter(t=>t.dueDate<today&&!t.done);
+  const upcomingTasks = tasks.filter(t=>t.dueDate>today&&!t.done).sort((a,b)=>a.dueDate.localeCompare(b.dueDate));
+  const urgentRenewals= renewals.filter(r=>daysUntil(r.renewalDate)<=30&&r.status!=="done");
+  const wfFilled = WORKFLOW_FIELDS.filter(f=>workflow[f.key]?.trim()).length;
+  const wfPct    = Math.round((wfFilled/WORKFLOW_FIELDS.length)*100);
+  const toggleDone  = id=>setTasks(ts=>ts.map(t=>t.id===id?{...t,done:!t.done}:t));
+  const deleteTask  = id=>setTasks(ts=>ts.filter(t=>t.id!==id));
+  const markRenDone = id=>setRenewals(rs=>rs.map(r=>r.id===id?{...r,status:"done"}:r));
+  const sys = buildSystemPrompt(tasks,clients,renewals,workflow);
+  const saveWorkflow=()=>{setWorkflow(w=>({...w,...wfEdits}));setWfEdits({});setWfSaved(true);setTimeout(()=>setWfSaved(false),2200);};
+  const filteredTasks=tasks.filter(t=>{
+    if(filterCat==="all")return true;
+    if(filterCat==="done")return t.done;
+    return t.category===filterCat&&!t.done;
+  }).sort((a,b)=>{if(a.done!==b.done)return a.done?1:-1;return a.dueDate.localeCompare(b.dueDate);});
+
+  // AI actions
+  const sendChat=async()=>{
+    if(!chatInput.trim()||aiLoading)return;
+    if(!isOnline){setChatHistory(h=>[...h,{role:"user",content:chatInput},{role:"assistant",content:"⚠️ You're offline. AI needs internet."}]);setChatInput("");return;}
+    const userMsg={role:"user",content:chatInput.trim()};
+    const newHist=[...chatHistory,userMsg];
+    setChatHistory(newHist);setChatInput("");setAiLoading(true);
+    try{const r=await callClaude(newHist.map(m=>({role:m.role,content:m.content})),sys);setChatHistory(h=>[...h,{role:"assistant",content:r}]);}
+    catch{setChatHistory(h=>[...h,{role:"assistant",content:"Connection error. Try again."}]);}
+    setAiLoading(false);
+  };
+  const genBriefing=async()=>{
+    if(!isOnline){setBriefing("⚠️ Offline.");return;}
+    setAiLoading(true);setBriefing("");
+    try{const r=await callClaude([{role:"user",content:`Generate my personalised daily briefing for today (${today}). Priority actions, overdue items, renewals, time-blocked schedule 9am–6pm (skip 1–2pm lunch).`}],sys);setBriefing(r);}
+    catch{setBriefing("Failed. Try again.");}setAiLoading(false);
+  };
+  const genEmail=async()=>{
+    if(!emailCtx.clientId||!emailCtx.purpose)return;
+    if(!isOnline){setEmailDraft("⚠️ Offline.");return;}
+    const cl=clients.find(c=>c.id===emailCtx.clientId);
+    setAiLoading(true);setEmailDraft("");
+    try{const r=await callClaude([{role:"user",content:`Draft a professional email to ${cl.name} (${cl.email}) for: "${emailCtx.purpose}". Match my communication style. Include subject line.`}],sys);setEmailDraft(r);}
+    catch{setEmailDraft("Connection error.");}setAiLoading(false);
+  };
+  const genSuggestions=async()=>{
+    if(!isOnline)return;
+    setAiLoading(true);setSuggestions([]);
+    try{const r=await callClaude([{role:"user",content:`Suggest 5 tasks based on my workflow routines. Return ONLY JSON array: [{"title":"...","category":"tax|web|social|billing|admin","priority":"high|medium|low","dueDate":"YYYY-MM-DD","notes":"...","reason":"..."}]. Today is ${today}.`}],sys);
+      setSuggestions(JSON.parse(r.replace(/```json|```/g,"").trim()));}
+    catch{setSuggestions([]);}setAiLoading(false);
+  };
+  const addSuggested=s=>{setTasks(ts=>[...ts,{...s,id:uid(),done:false,clientId:"",time:""}]);setSuggestions(ss=>ss.filter(x=>x!==s));};
+  const openAI=(tab,cb)=>{setAiOpen(true);setAiTab(tab);if(cb)cb();};
+
+  // PAGE CONTENT — shared between mobile and desktop
+  const pageContent = (
+    <div>
+      {/* ═══ HOME ═══ */}
+      {view==="home"&&(
+        <div>
+          <div style={{marginBottom:20}}>
+            <h1 style={{fontFamily:"'Playfair Display',serif",fontSize:"clamp(22px,4vw,28px)",letterSpacing:"-.01em"}}>{greet} 👋</h1>
+            <p style={{color:"var(--text3)",fontSize:13,marginTop:4}}>{now.toLocaleDateString("en-MY",{weekday:"long",day:"numeric",month:"long"})}</p>
           </div>
-
-          {/* SCROLL CONTENT */}
-          <div className="scroll-area">
-
-            {/* ═══ HOME ═══ */}
-            {view==="home"&&(
-              <div>
-                <div style={{marginBottom:16}}>
-                  <h1 style={{fontFamily:"'Playfair Display',serif",fontSize:24,letterSpacing:"-.01em"}}>{greet} 👋</h1>
-                  <p style={{color:"#555",fontSize:13,marginTop:3}}>{now.toLocaleDateString("en-MY",{weekday:"long",day:"numeric",month:"long"})}</p>
-                </div>
-                <div className="stat-row">
-                  {[
-                    {label:"Today",v:todayTasks.length,c:"#e8c858",i:"📅"},
-                    {label:"Overdue",v:overdueTasks.length,c:"#ff5757",i:"⚠️"},
-                    {label:"Renewals <30d",v:urgentRenewals.length,c:"#38c3e8",i:"🔄"},
-                    {label:"Pending",v:tasks.filter(t=>!t.done).length,c:"#a8e838",i:"📋"},
-                  ].map(s=>(
-                    <div key={s.label} className="stat-card">
-                      <div style={{fontSize:20,marginBottom:4}}>{s.i}</div>
-                      <div style={{fontSize:26,fontWeight:700,color:s.c,fontFamily:"'Playfair Display',serif"}}>{s.v}</div>
-                      <div style={{fontSize:11.5,color:"#555",marginTop:2}}>{s.label}</div>
-                    </div>
-                  ))}
-                </div>
-                <div style={{background:"linear-gradient(135deg,#0d0c1e,#080e18)",border:"1px solid #181830",borderRadius:14,padding:"12px 14px",marginBottom:14}}>
-                  <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:10}}>
-                    <span style={{background:"linear-gradient(135deg,#2a1f5a,#1a3a5a)",border:"1px solid #3a2a7a",borderRadius:12,padding:"2px 8px",fontSize:10,color:"#a090ff",fontWeight:700}}>✦ AI</span>
-                    <span style={{fontSize:12,color:isOnline?"#555":"#6b5010"}}>{isOnline?"Personalised for your workflow":"Offline — AI paused"}</span>
-                  </div>
-                  <div className="qa-row">
-                    <button className="qa-btn" onClick={()=>openAI("briefing",genBriefing)}><span className="qa-icon">📋</span><span className="qa-label">Daily Brief</span></button>
-                    <button className="qa-btn" onClick={()=>openAI("suggest",genSuggestions)}><span className="qa-icon">💡</span><span className="qa-label">Suggest Tasks</span></button>
-                    <button className="qa-btn" onClick={()=>openAI("email",null)}><span className="qa-icon">✉️</span><span className="qa-label">Draft Email</span></button>
-                    <button className="qa-btn" onClick={()=>openAI("chat",null)}><span className="qa-icon">💬</span><span className="qa-label">Ask AI</span></button>
-                  </div>
-                </div>
-                {overdueTasks.length>0&&(
-                  <div style={{marginBottom:14}}>
-                    <div className="sec-head">
-                      <div style={{width:3,height:16,background:"#ff5757",borderRadius:2}}/>
-                      <span style={{fontFamily:"'Playfair Display',serif",fontSize:15,color:"#ff8080"}}>Overdue ({overdueTasks.length})</span>
-                    </div>
-                    {overdueTasks.slice(0,3).map(t=><MTaskRow key={t.id} task={t} clients={clients} onToggle={toggleDone} onDelete={deleteTask} onEdit={setEditTask}/>)}
-                    {overdueTasks.length>3&&<button className="btn btn-ghost btn-full btn-sm" style={{marginBottom:6}} onClick={()=>setView("tasks")}>View all {overdueTasks.length} overdue →</button>}
-                  </div>
-                )}
-                <div style={{marginBottom:14}}>
-                  <div className="sec-head">
-                    <div style={{width:3,height:16,background:"#e8c858",borderRadius:2}}/>
-                    <span style={{fontFamily:"'Playfair Display',serif",fontSize:15,color:"#ccc"}}>Today — {now.toLocaleDateString("en-MY",{day:"numeric",month:"short"})}</span>
-                  </div>
-                  {todayTasks.length===0
-                    ?<div style={{color:"#444",fontSize:13,padding:"10px 0"}}>No tasks due today ✅</div>
-                    :todayTasks.map(t=><MTaskRow key={t.id} task={t} clients={clients} onToggle={toggleDone} onDelete={deleteTask} onEdit={setEditTask}/>)}
-                </div>
-                {upcomingTasks.length>0&&(
-                  <div style={{marginBottom:14}}>
-                    <div className="sec-head">
-                      <div style={{width:3,height:16,background:"#38c3e8",borderRadius:2}}/>
-                      <span style={{fontFamily:"'Playfair Display',serif",fontSize:15,color:"#ccc"}}>Coming Up</span>
-                    </div>
-                    {upcomingTasks.slice(0,4).map(t=><MTaskRow key={t.id} task={t} clients={clients} onToggle={toggleDone} onDelete={deleteTask} onEdit={setEditTask}/>)}
-                  </div>
-                )}
-                {urgentRenewals.length>0&&(
-                  <div>
-                    <div className="sec-head">
-                      <div style={{width:3,height:16,background:"#38c3e8",borderRadius:2}}/>
-                      <span style={{fontFamily:"'Playfair Display',serif",fontSize:15,color:"#ccc"}}>Renewal Alerts</span>
-                    </div>
-                    {urgentRenewals.slice(0,3).map(r=>{
-                      const cl=clients.find(c=>c.id===r.clientId);
-                      const dl=dayLabel(daysUntil(r.renewalDate));
-                      return(
-                        <div key={r.id} className="card-sm" style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
-                          <div style={{flex:1,minWidth:0}}>
-                            <div style={{fontWeight:600,fontSize:13.5,marginBottom:2,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{r.service}</div>
-                            <div style={{fontSize:12,color:"#555"}}>{cl?.name} · <span style={{color:"#57ff9c",fontWeight:600}}>RM {r.billingAmount}</span></div>
-                          </div>
-                          <span style={{fontSize:12,fontWeight:700,color:dl.color,flexShrink:0,marginLeft:8}}>{dl.text}</span>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
+          <div className="stat-grid">
+            {[
+              {label:"Today",v:todayTasks.length,c:"var(--gold)",i:"📅"},
+              {label:"Overdue",v:overdueTasks.length,c:"var(--red)",i:"⚠️"},
+              {label:"Renewals <30d",v:urgentRenewals.length,c:"var(--blue)",i:"🔄"},
+              {label:"Pending",v:tasks.filter(t=>!t.done).length,c:"#a8e838",i:"📋"},
+            ].map(s=>(
+              <div key={s.label} className="stat-card">
+                <div style={{fontSize:20,marginBottom:4}}>{s.i}</div>
+                <div style={{fontSize:28,fontWeight:700,color:s.c,fontFamily:"'Playfair Display',serif"}}>{s.v}</div>
+                <div style={{fontSize:11.5,color:"var(--text3)",marginTop:2}}>{s.label}</div>
               </div>
-            )}
-
-            {/* ═══ TASKS ═══ */}
-            {view==="tasks"&&(
-              <div>
-                <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14}}>
-                  <h1 style={{fontFamily:"'Playfair Display',serif",fontSize:22}}>Tasks</h1>
-                  <div style={{display:"flex",gap:7}}>
-                    <button className="btn btn-ai btn-sm" onClick={()=>openAI("suggest",genSuggestions)}>✦</button>
-                    <button className="btn btn-gold btn-sm" onClick={()=>setShowAddTask(true)}>+ Add</button>
-                  </div>
-                </div>
-                <div className="chips">
-                  {[["all","All"],["done","Done ✓"],["tax","📋 Tax"],["web","🌐 Web"],["social","📱 Social"],["billing","💰 Billing"],["admin","📁 Admin"]].map(([k,l])=>(
-                    <button key={k} className={`chip${filterCat===k?" active":""}`} onClick={()=>setFilterCat(k)}>{l}</button>
-                  ))}
-                </div>
-                {filteredTasks.length===0
-                  ?<div style={{color:"#444",fontSize:14,padding:"24px 0",textAlign:"center"}}>No tasks here.</div>
-                  :filteredTasks.map(t=><MTaskRow key={t.id} task={t} clients={clients} onToggle={toggleDone} onDelete={deleteTask} onEdit={setEditTask}/>)}
-              </div>
-            )}
-
-            {/* ═══ RENEWALS ═══ */}
-            {view==="renewals"&&(
-              <div>
-                <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14}}>
-                  <h1 style={{fontFamily:"'Playfair Display',serif",fontSize:22}}>Renewals</h1>
-                  <button className="btn btn-gold btn-sm" onClick={()=>setShowAddRenewal(true)}>+ Add</button>
-                </div>
-                {renewals.sort((a,b)=>a.renewalDate.localeCompare(b.renewalDate)).map(r=>{
-                  const cl=clients.find(c=>c.id===r.clientId);
-                  const d=daysUntil(r.renewalDate);
-                  const dl=dayLabel(d);
-                  const done=r.status==="done";
-                  return(
-                    <div key={r.id} className="card" style={{opacity:done?.4:1,borderColor:d<=7&&!done?"#2e1a1a":"#1c1c28"}}>
-                      <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:10}}>
-                        <div style={{flex:1,minWidth:0,marginRight:8}}>
-                          <div style={{fontWeight:600,fontSize:15,marginBottom:2}}>{r.service}</div>
-                          <div style={{fontSize:13,color:"#555"}}>{cl?.name}</div>
-                        </div>
-                        <span style={{fontSize:12,fontWeight:700,color:dl.color,background:"#08080d",padding:"3px 9px",borderRadius:12,flexShrink:0}}>{done?"✓ Done":dl.text}</span>
-                      </div>
-                      <div className="ren-cols">
-                        {[["Cost",`RM ${r.cost}`,"#ff7070"],["Billing",`RM ${r.billingAmount}`,"#57ff9c"],["Profit",`RM ${r.billingAmount-r.cost}`,"#e8c858"]].map(([l,v,c])=>(
-                          <div key={l} className="ren-col">
-                            <div className="lbl">{l}</div>
-                            <div style={{fontWeight:700,color:c,fontSize:14}}>{v}</div>
-                          </div>
-                        ))}
-                      </div>
-                      <div style={{fontSize:12,color:"#555",marginBottom:10}}>📅 {fmtDateFull(r.renewalDate)}{r.notes?` · ${r.notes}`:""}</div>
-                      {!done&&(
-                        <div style={{display:"flex",gap:7}}>
-                          <button className="btn btn-ai btn-sm" style={{flex:1}} onClick={()=>{openAI("email",null);setEmailCtx({clientId:r.clientId,purpose:`Send renewal invoice for ${r.service}, billing RM${r.billingAmount}, due ${r.renewalDate}`});}}>✦ Email</button>
-                          <button className="btn btn-ghost btn-sm" style={{flex:1}} onClick={()=>markRenDone(r.id)}>Mark Done</button>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-
-            {/* ═══ CLIENTS ═══ */}
-            {view==="clients"&&(
-              <div>
-                <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14}}>
-                  <h1 style={{fontFamily:"'Playfair Display',serif",fontSize:22}}>Clients</h1>
-                  <button className="btn btn-gold btn-sm" onClick={()=>setShowAddClient(true)}>+ Add</button>
-                </div>
-                {clients.map(c=>{
-                  const cT=tasks.filter(t=>t.clientId===c.id&&!t.done);
-                  const cR=renewals.filter(r=>r.clientId===c.id&&r.status!=="done");
-                  const tot=renewals.filter(r=>r.clientId===c.id).reduce((a,r)=>a+r.billingAmount,0);
-                  return(
-                    <div key={c.id} className="card">
-                      <div style={{display:"flex",alignItems:"center",gap:11,marginBottom:12}}>
-                        <div style={{width:42,height:42,borderRadius:12,background:c.type==="tax"?"#2a1f06":"#061a2a",display:"flex",alignItems:"center",justifyContent:"center",fontSize:20}}>{c.type==="tax"?"📋":"🌐"}</div>
-                        <div style={{flex:1,minWidth:0}}>
-                          <div style={{fontWeight:600,fontSize:15,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{c.name}</div>
-                          <div style={{fontSize:12,color:"#444"}}>{c.email}</div>
-                        </div>
-                      </div>
-                      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:7,marginBottom:11}}>
-                        <div style={{background:"#08080d",borderRadius:8,padding:"8px 10px"}}><div className="lbl">Tasks</div><div style={{fontWeight:700,color:"#e8c858"}}>{cT.length}</div></div>
-                        <div style={{background:"#08080d",borderRadius:8,padding:"8px 10px"}}><div className="lbl">Renewals</div><div style={{fontWeight:700,color:"#38c3e8"}}>{cR.length}</div></div>
-                        <div style={{background:"#08080d",borderRadius:8,padding:"8px 10px"}}><div className="lbl">Billed</div><div style={{fontWeight:700,color:"#57ff9c",fontSize:13}}>RM {tot}</div></div>
-                      </div>
-                      <button className="btn btn-ai btn-full btn-sm" onClick={()=>{openAI("email",null);setEmailCtx({clientId:c.id,purpose:""});}}>✦ Draft Email</button>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-
-            {/* ═══ WORKFLOW ═══ */}
-            {view==="workflow"&&(
-              <div>
-                <div style={{marginBottom:14}}>
-                  <h1 style={{fontFamily:"'Playfair Display',serif",fontSize:22,marginBottom:4}}>🧠 My Workflow</h1>
-                  <p style={{fontSize:13,color:"#555",lineHeight:1.5}}>Feed the AI your routines so it learns how you work.</p>
-                </div>
-                <div className="card" style={{marginBottom:14}}>
-                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
-                    <span style={{fontSize:13,fontWeight:600,color:wfPct>=80?"#60c860":wfPct>=40?"#e8a838":"#c85050"}}>AI Profile {wfPct}% complete</span>
-                    <span style={{fontSize:12,color:"#555"}}>{wfFilled}/{WORKFLOW_FIELDS.length} filled</span>
-                  </div>
-                  <div className="wf-bar-bg">
-                    <div className="wf-bar" style={{width:`${wfPct}%`,background:wfPct>=80?"linear-gradient(90deg,#40a840,#60c860)":wfPct>=40?"linear-gradient(90deg,#c88020,#e8a838)":"linear-gradient(90deg,#a82020,#c84040)"}}/>
-                  </div>
-                  {Object.keys(wfEdits).length>0&&<button className="btn btn-ghost btn-full btn-sm" style={{marginTop:10,color:"#60d060",borderColor:"#2a3a2a"}} onClick={saveWorkflow}>💾 Save Changes</button>}
-                  {wfSaved&&Object.keys(wfEdits).length===0&&<div style={{fontSize:12,color:"#60c860",textAlign:"center",marginTop:8}}>✓ Saved!</div>}
-                </div>
-                {WORKFLOW_FIELDS.map(field=>{
-                  const current=wfEdits[field.key]!==undefined?wfEdits[field.key]:(workflow[field.key]||"");
-                  const isFilled=current.trim().length>0;
-                  const isExp=wfExpanded===field.key;
-                  return(
-                    <div key={field.key} className={`wf-card${isFilled?" filled":""}`}>
-                      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",cursor:"pointer"}} onClick={()=>setWfExpanded(isExp?null:field.key)}>
-                        <div style={{display:"flex",alignItems:"center",gap:8}}>
-                          <span style={{fontSize:18}}>{field.icon}</span>
-                          <span style={{fontWeight:600,fontSize:14,color:"#ccc"}}>{field.label}</span>
-                          {isFilled&&<span style={{fontSize:10,background:"#0e1e0e",color:"#50a850",border:"1px solid #183018",borderRadius:10,padding:"1px 7px",fontWeight:700}}>✓</span>}
-                        </div>
-                        <span style={{fontSize:14,color:"#444",display:"inline-block",transform:isExp?"rotate(180deg)":"none",transition:"transform .2s"}}>▾</span>
-                      </div>
-                      {isExp&&(
-                        <div style={{marginTop:10}}>
-                          <textarea className="input" style={{fontSize:13.5}} value={current} placeholder={`Describe your ${field.label.toLowerCase()}…`} onChange={e=>setWfEdits(ed=>({...ed,[field.key]:e.target.value}))}/>
-                          {Object.keys(wfEdits).length>0&&<button className="btn btn-ghost btn-full btn-sm" style={{marginTop:8,color:"#60d060",borderColor:"#2a3a2a"}} onClick={saveWorkflow}>💾 Save</button>}
-                        </div>
-                      )}
-                      {!isExp&&isFilled&&<div style={{fontSize:12,color:"#555",marginTop:6,overflow:"hidden",display:"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical"}}>{current}</div>}
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-
-          </div>
-
-          {/* BOTTOM NAV */}
-          <div className="bottom-nav">
-            {[["home","🏠","Home"],["tasks","✅","Tasks"],["renewals","🔄","Renewals"],["clients","👥","Clients"],["workflow","🧠","Workflow"]].map(([k,icon,label])=>(
-              <button key={k} className={`tab-btn${view===k?" active":""}`} onClick={()=>setView(k)}>
-                <span className="tab-icon">{icon}</span>
-                <span className="tab-label">{label}</span>
-              </button>
             ))}
           </div>
 
-          {/* AI SHEET */}
-          {aiOpen&&(
-            <>
-              <div className="sheet-overlay" onClick={()=>setAiOpen(false)}/>
-              <div className="sheet">
-                <div className="sheet-handle"/>
-                <div style={{padding:"12px 16px 0",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
-                  <div style={{display:"flex",alignItems:"center",gap:7}}>
-                    <span style={{background:"linear-gradient(135deg,#2a1f5a,#1a3a5a)",border:"1px solid #3a2a7a",borderRadius:12,padding:"2px 8px",fontSize:10,color:"#a090ff",fontWeight:700}}>✦ AI</span>
-                    <span style={{fontFamily:"'Playfair Display',serif",fontSize:16,color:"#b8aaf8"}}>Assistant</span>
-                    <span style={{fontSize:11,color:wfPct>=80?"#60c860":"#887030",background:wfPct>=80?"#0e1e0e":"#181208",border:`1px solid ${wfPct>=80?"#1c3a1c":"#302010"}`,borderRadius:10,padding:"1px 7px",fontWeight:600}}>{wfPct}%</span>
-                    {!isOnline&&<span style={{fontSize:11,color:"#e8a838",background:"#1a1008",border:"1px solid #2a2008",borderRadius:10,padding:"1px 7px",fontWeight:600}}>Offline</span>}
+          {/* AI Quick actions */}
+          <div style={{background:"linear-gradient(135deg,#0d0c1e,#080e18)",border:"1px solid #181830",borderRadius:14,padding:"12px 14px",marginBottom:16}}>
+            <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:10}}>
+              <span style={{background:"linear-gradient(135deg,#2a1f5a,#1a3a5a)",border:"1px solid #3a2a7a",borderRadius:12,padding:"2px 8px",fontSize:10,color:"#a090ff",fontWeight:700}}>✦ AI</span>
+              <span style={{fontSize:12,color:isOnline?"var(--text3)":"#6b5010"}}>{isOnline?"Personalised for your workflow":"Offline — AI paused"}</span>
+            </div>
+            <div className="qa-grid">
+              <button className="qa-btn" onClick={()=>openAI("briefing",genBriefing)}><span className="qa-icon">📋</span><span className="qa-label">Daily Brief</span></button>
+              <button className="qa-btn" onClick={()=>openAI("suggest",genSuggestions)}><span className="qa-icon">💡</span><span className="qa-label">Suggest Tasks</span></button>
+              <button className="qa-btn" onClick={()=>openAI("email",null)}><span className="qa-icon">✉️</span><span className="qa-label">Draft Email</span></button>
+              <button className="qa-btn" onClick={()=>openAI("chat",null)}><span className="qa-icon">💬</span><span className="qa-label">Ask AI</span></button>
+            </div>
+          </div>
+
+          <div className="dash-grid">
+            <div>
+              {overdueTasks.length>0&&(
+                <div style={{marginBottom:16}}>
+                  <div className="sec-head"><div className="sec-bar" style={{background:"var(--red)"}}/><span className="sec-title" style={{color:"#ff8080"}}>Overdue ({overdueTasks.length})</span></div>
+                  {overdueTasks.slice(0,4).map(t=><TaskRow key={t.id} task={t} clients={clients} onToggle={toggleDone} onDelete={deleteTask} onEdit={setEditTask}/>)}
+                </div>
+              )}
+              <div className="sec-head"><div className="sec-bar" style={{background:"var(--gold)"}}/><span className="sec-title">Today — {now.toLocaleDateString("en-MY",{day:"numeric",month:"short"})}</span></div>
+              {todayTasks.length===0
+                ?<div style={{color:"#444",fontSize:13,padding:"10px 0"}}>No tasks due today ✅</div>
+                :todayTasks.map(t=><TaskRow key={t.id} task={t} clients={clients} onToggle={toggleDone} onDelete={deleteTask} onEdit={setEditTask}/>)}
+              {upcomingTasks.length>0&&(
+                <div style={{marginTop:16}}>
+                  <div className="sec-head"><div className="sec-bar" style={{background:"var(--blue)"}}/><span className="sec-title">Coming Up</span></div>
+                  {upcomingTasks.slice(0,4).map(t=><TaskRow key={t.id} task={t} clients={clients} onToggle={toggleDone} onDelete={deleteTask} onEdit={setEditTask}/>)}
+                </div>
+              )}
+            </div>
+            <div>
+              {urgentRenewals.length>0&&(
+                <div>
+                  <div className="sec-head"><div className="sec-bar" style={{background:"var(--blue)"}}/><span className="sec-title">Renewal Alerts</span></div>
+                  {urgentRenewals.slice(0,4).map(r=>{
+                    const cl=clients.find(c=>c.id===r.clientId);
+                    const dl=dayLabel(daysUntil(r.renewalDate));
+                    return(
+                      <div key={r.id} className="card-sm" style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+                        <div style={{flex:1,minWidth:0}}>
+                          <div style={{fontWeight:600,fontSize:13.5,marginBottom:2,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{r.service}</div>
+                          <div style={{fontSize:12,color:"var(--text3)"}}>{cl?.name} · <span style={{color:"var(--green)",fontWeight:600}}>RM {r.billingAmount}</span></div>
+                        </div>
+                        <span style={{fontSize:12,fontWeight:700,color:dl.color,flexShrink:0,marginLeft:8}}>{dl.text}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ═══ TASKS ═══ */}
+      {view==="tasks"&&(
+        <div>
+          <div className="page-header">
+            <h1 className="page-title">Tasks</h1>
+            <div style={{display:"flex",gap:8}}>
+              <button className="btn btn-ai btn-sm" onClick={()=>openAI("suggest",genSuggestions)}>✦ AI</button>
+              <button className="btn btn-gold btn-sm" onClick={()=>setShowAddTask(true)}>+ Add Task</button>
+            </div>
+          </div>
+          <div className="chips">
+            {[["all","All"],["done","Done ✓"],["tax","📋 Tax"],["web","🌐 Web"],["social","📱 Social"],["billing","💰 Billing"],["admin","📁 Admin"]].map(([k,l])=>(
+              <button key={k} className={`chip${filterCat===k?" active":""}`} onClick={()=>setFilterCat(k)}>{l}</button>
+            ))}
+          </div>
+          {filteredTasks.length===0
+            ?<div style={{color:"#444",fontSize:14,padding:"24px 0",textAlign:"center"}}>No tasks here.</div>
+            :filteredTasks.map(t=><TaskRow key={t.id} task={t} clients={clients} onToggle={toggleDone} onDelete={deleteTask} onEdit={setEditTask}/>)}
+        </div>
+      )}
+
+      {/* ═══ RENEWALS ═══ */}
+      {view==="renewals"&&(
+        <div>
+          <div className="page-header">
+            <h1 className="page-title">Renewals</h1>
+            <button className="btn btn-gold btn-sm" onClick={()=>setShowAddRenewal(true)}>+ Add</button>
+          </div>
+          <div className="renewals-grid">
+            {renewals.sort((a,b)=>a.renewalDate.localeCompare(b.renewalDate)).map(r=>{
+              const cl=clients.find(c=>c.id===r.clientId);
+              const d=daysUntil(r.renewalDate);
+              const dl=dayLabel(d);
+              const done=r.status==="done";
+              return(
+                <div key={r.id} className="card" style={{opacity:done?.4:1,borderColor:d<=7&&!done?"#2e1a1a":"var(--border)",marginBottom:0}}>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:10}}>
+                    <div style={{flex:1,minWidth:0,marginRight:8}}>
+                      <div style={{fontWeight:600,fontSize:15,marginBottom:2}}>{r.service}</div>
+                      <div style={{fontSize:13,color:"var(--text3)"}}>{cl?.name}</div>
+                    </div>
+                    <span style={{fontSize:12,fontWeight:700,color:dl.color,background:"#08080d",padding:"3px 9px",borderRadius:12,flexShrink:0}}>{done?"✓ Done":dl.text}</span>
                   </div>
-                  <button className="btn btn-ghost btn-sm" style={{padding:"5px 11px"}} onClick={()=>setAiOpen(false)}>✕</button>
-                </div>
-                <div className="sheet-tabs">
-                  {[["chat","💬 Chat"],["briefing","📋 Brief"],["email","✉️ Email"],["suggest","💡 Tasks"]].map(([k,l])=>(
-                    <button key={k} className="sheet-tab" onClick={()=>setAiTab(k)} style={{borderBottom:`2px solid ${aiTab===k?"#6858c8":"transparent"}`,color:aiTab===k?"#a898f0":"#555"}}>{l}</button>
-                  ))}
-                </div>
-                <div style={{flex:1,overflow:"hidden",display:"flex",flexDirection:"column"}}>
-                  {aiTab==="chat"&&(
-                    <>
-                      <div style={{flex:1,overflowY:"auto",padding:"12px 14px",display:"flex",flexDirection:"column",gap:8}}>
-                        {chatHistory.map((m,i)=><div key={i} className={`ai-bubble ${m.role}`}>{m.content}</div>)}
-                        {aiLoading&&<div className="ai-bubble assistant" style={{display:"flex",gap:5}}><span className="typing-dot"/><span className="typing-dot"/><span className="typing-dot"/></div>}
-                        <div ref={chatEndRef}/>
-                      </div>
-                      <div style={{padding:"0 12px 4px",display:"flex",gap:6,overflowX:"auto"}}>
-                        {["What's urgent today?","Any overdue?","Next renewal?","What to do now?"].map(p=>(
-                          <button key={p} onClick={()=>setChatInput(p)} style={{flexShrink:0,background:"#10101a",border:"1px solid #1c1c2c",borderRadius:14,padding:"5px 11px",fontSize:12,color:"#555",cursor:"pointer",fontFamily:"inherit"}}>{p}</button>
-                        ))}
-                      </div>
-                      <div style={{padding:"10px 12px",borderTop:"1px solid #181828",display:"flex",gap:8,paddingBottom:"calc(10px + env(safe-area-inset-bottom))"}}>
-                        <input className="input" style={{fontSize:14,padding:"11px 13px"}} placeholder={isOnline?"Ask anything…":"Offline — AI paused"} value={chatInput} onChange={e=>setChatInput(e.target.value)} onKeyDown={e=>{if(e.key==="Enter"){e.preventDefault();sendChat();}}} disabled={!isOnline}/>
-                        <button className="btn btn-gold" style={{padding:"11px 16px",flexShrink:0}} onClick={sendChat} disabled={aiLoading||!isOnline}>↑</button>
-                      </div>
-                    </>
-                  )}
-                  {aiTab==="briefing"&&(
-                    <div style={{flex:1,overflowY:"auto",padding:"14px"}}>
-                      <p style={{fontSize:13.5,color:"#666",marginBottom:12,lineHeight:1.55}}>AI generates a personalised briefing based on your workflow routines and current tasks.</p>
-                      <button className="btn btn-gold btn-full" style={{marginBottom:14}} onClick={genBriefing} disabled={aiLoading||!isOnline}>{aiLoading?"Generating…":!isOnline?"Offline":"📋 Generate Daily Briefing"}</button>
-                      {aiLoading&&!briefing&&<div style={{display:"flex",gap:5,justifyContent:"center",padding:"16px"}}><span className="typing-dot"/><span className="typing-dot"/><span className="typing-dot"/></div>}
-                      {briefing&&<div className="ai-bubble assistant">{briefing}</div>}
-                    </div>
-                  )}
-                  {aiTab==="email"&&(
-                    <div style={{flex:1,overflowY:"auto",padding:"14px",display:"flex",flexDirection:"column",gap:11}}>
-                      <p style={{fontSize:13.5,color:"#666",lineHeight:1.5}}>AI drafts emails matching your communication style.</p>
-                      <div><div className="lbl">Client</div>
-                        <select className="select" value={emailCtx.clientId} onChange={e=>setEmailCtx(x=>({...x,clientId:e.target.value}))}>
-                          <option value="">— Select client —</option>
-                          {clients.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
-                        </select>
-                      </div>
-                      <div><div className="lbl">Purpose</div>
-                        <textarea className="input" placeholder="e.g. Renewal invoice for GoDaddy RM280 due April 15" value={emailCtx.purpose} onChange={e=>setEmailCtx(x=>({...x,purpose:e.target.value}))}/>
-                      </div>
-                      <button className="btn btn-gold btn-full" onClick={genEmail} disabled={aiLoading||!emailCtx.clientId||!emailCtx.purpose||!isOnline}>{aiLoading?"Drafting…":!isOnline?"Offline":"✦ Draft with AI"}</button>
-                      {aiLoading&&!emailDraft&&<div style={{display:"flex",gap:5,justifyContent:"center"}}><span className="typing-dot"/><span className="typing-dot"/><span className="typing-dot"/></div>}
-                      {emailDraft&&(
-                        <>
-                          <div className="ai-bubble assistant">{emailDraft}</div>
-                          <button className="btn btn-ghost btn-full" onClick={()=>navigator.clipboard?.writeText(emailDraft)}>📋 Copy</button>
-                        </>
-                      )}
-                    </div>
-                  )}
-                  {aiTab==="suggest"&&(
-                    <div style={{flex:1,overflowY:"auto",padding:"14px",display:"flex",flexDirection:"column",gap:10}}>
-                      <p style={{fontSize:13.5,color:"#666",lineHeight:1.5}}>AI suggests tasks based on your routines and current workload.</p>
-                      <button className="btn btn-gold btn-full" onClick={genSuggestions} disabled={aiLoading||!isOnline}>{aiLoading?"Analysing…":!isOnline?"Offline":"💡 Suggest Tasks For Me"}</button>
-                      {aiLoading&&suggestions.length===0&&<div style={{display:"flex",gap:5,justifyContent:"center",padding:"16px"}}><span className="typing-dot"/><span className="typing-dot"/><span className="typing-dot"/></div>}
-                      {suggestions.map((s,i)=>{
-                        const cat=CATEGORIES[s.category]||CATEGORIES.admin;
-                        const pri=PRIORITIES[s.priority]||PRIORITIES.medium;
-                        return(
-                          <div key={i} className="card-sm">
-                            <div style={{fontWeight:600,fontSize:14,marginBottom:6}}>{s.title}</div>
-                            <div style={{display:"flex",gap:5,marginBottom:6,flexWrap:"wrap"}}>
-                              <span className="pill" style={{background:cat.bg,color:cat.color}}>{cat.icon} {cat.label}</span>
-                              <span className="pill" style={{background:"#1a1014",color:pri.color}}>● {pri.label}</span>
-                              {s.dueDate&&<span style={{fontSize:11.5,color:"#555"}}>📅 {fmtDate(s.dueDate)}</span>}
-                            </div>
-                            {s.reason&&<div style={{fontSize:12,color:"#6858a8",fontStyle:"italic",marginBottom:6}}>✦ {s.reason}</div>}
-                            {s.notes&&<div style={{fontSize:12,color:"#555",marginBottom:6}}>{s.notes}</div>}
-                            <button className="btn btn-gold btn-sm" onClick={()=>addSuggested(s)}>+ Add to Tasks</button>
-                          </div>
-                        );
-                      })}
-                      {!aiLoading&&suggestions.length===0&&<div style={{color:"#333",fontSize:13,textAlign:"center",padding:"16px 0"}}>Tap above to get AI suggestions.</div>}
+                  <div className="ren-cols">
+                    {[["Cost",`RM ${r.cost}`,"#ff7070"],["Billing",`RM ${r.billingAmount}`,"var(--green)"],["Profit",`RM ${r.billingAmount-r.cost}`,"var(--gold)"]].map(([l,v,c])=>(
+                      <div key={l} className="ren-col"><div className="lbl">{l}</div><div style={{fontWeight:700,color:c,fontSize:14}}>{v}</div></div>
+                    ))}
+                  </div>
+                  <div style={{fontSize:12,color:"var(--text3)",marginBottom:done?0:10}}>📅 {fmtDateFull(r.renewalDate)}{r.notes?` · ${r.notes}`:""}</div>
+                  {!done&&(
+                    <div style={{display:"flex",gap:7}}>
+                      <button className="btn btn-ai btn-sm" style={{flex:1}} onClick={()=>{openAI("email",null);setEmailCtx({clientId:r.clientId,purpose:`Send renewal invoice for ${r.service}, billing RM${r.billingAmount}`});}}>✦ Email</button>
+                      <button className="btn btn-ghost btn-sm" style={{flex:1}} onClick={()=>markRenDone(r.id)}>Mark Done</button>
                     </div>
                   )}
                 </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* ═══ CLIENTS ═══ */}
+      {view==="clients"&&(
+        <div>
+          <div className="page-header">
+            <h1 className="page-title">Clients</h1>
+            <button className="btn btn-gold btn-sm" onClick={()=>setShowAddClient(true)}>+ Add</button>
+          </div>
+          <div className="clients-grid">
+            {clients.map(c=>{
+              const cT=tasks.filter(t=>t.clientId===c.id&&!t.done);
+              const cR=renewals.filter(r=>r.clientId===c.id&&r.status!=="done");
+              const tot=renewals.filter(r=>r.clientId===c.id).reduce((a,r)=>a+r.billingAmount,0);
+              return(
+                <div key={c.id} className="card" style={{marginBottom:0}}>
+                  <div style={{display:"flex",alignItems:"center",gap:11,marginBottom:12}}>
+                    <div style={{width:42,height:42,borderRadius:12,background:c.type==="tax"?"#2a1f06":"#061a2a",display:"flex",alignItems:"center",justifyContent:"center",fontSize:20}}>{c.type==="tax"?"📋":"🌐"}</div>
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{fontWeight:600,fontSize:15,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{c.name}</div>
+                      <div style={{fontSize:12,color:"#444"}}>{c.email}</div>
+                    </div>
+                  </div>
+                  <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:7,marginBottom:11}}>
+                    <div style={{background:"#08080d",borderRadius:8,padding:"8px 10px"}}><div className="lbl">Tasks</div><div style={{fontWeight:700,color:"var(--gold)"}}>{cT.length}</div></div>
+                    <div style={{background:"#08080d",borderRadius:8,padding:"8px 10px"}}><div className="lbl">Renewals</div><div style={{fontWeight:700,color:"var(--blue)"}}>{cR.length}</div></div>
+                    <div style={{background:"#08080d",borderRadius:8,padding:"8px 10px"}}><div className="lbl">Billed</div><div style={{fontWeight:700,color:"var(--green)",fontSize:12}}>RM {tot}</div></div>
+                  </div>
+                  <button className="btn btn-ai btn-full btn-sm" onClick={()=>{openAI("email",null);setEmailCtx({clientId:c.id,purpose:""});}}>✦ Draft Email</button>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* ═══ WORKFLOW ═══ */}
+      {view==="workflow"&&(
+        <div>
+          <div className="page-header">
+            <h1 className="page-title">🧠 My Workflow</h1>
+          </div>
+          <div className="card" style={{marginBottom:16}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
+              <span style={{fontSize:13,fontWeight:600,color:wfPct>=80?"#60c860":wfPct>=40?"#e8a838":"#c85050"}}>AI Profile {wfPct}% complete</span>
+              <span style={{fontSize:12,color:"var(--text3)"}}>{wfFilled}/{WORKFLOW_FIELDS.length} filled</span>
+            </div>
+            <div className="wf-bar-bg">
+              <div className="wf-bar" style={{width:`${wfPct}%`,background:wfPct>=80?"linear-gradient(90deg,#40a840,#60c860)":wfPct>=40?"linear-gradient(90deg,#c88020,#e8a838)":"linear-gradient(90deg,#a82020,#c84040)"}}/>
+            </div>
+            {Object.keys(wfEdits).length>0&&<button className="btn btn-ghost btn-full btn-sm" style={{marginTop:10,color:"#60d060",borderColor:"#2a3a2a"}} onClick={saveWorkflow}>💾 Save Changes</button>}
+            {wfSaved&&Object.keys(wfEdits).length===0&&<div style={{fontSize:12,color:"#60c860",textAlign:"center",marginTop:8}}>✓ Saved!</div>}
+          </div>
+          {WORKFLOW_FIELDS.map(field=>{
+            const current=wfEdits[field.key]!==undefined?wfEdits[field.key]:(workflow[field.key]||"");
+            const isFilled=current.trim().length>0;
+            const isExp=wfExpanded===field.key;
+            return(
+              <div key={field.key} className={`wf-card${isFilled?" filled":""}`}>
+                <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",cursor:"pointer"}} onClick={()=>setWfExpanded(isExp?null:field.key)}>
+                  <div style={{display:"flex",alignItems:"center",gap:8}}>
+                    <span style={{fontSize:18}}>{field.icon}</span>
+                    <span style={{fontWeight:600,fontSize:14,color:"#ccc"}}>{field.label}</span>
+                    {isFilled&&<span style={{fontSize:10,background:"#0e1e0e",color:"#50a850",border:"1px solid #183018",borderRadius:10,padding:"1px 7px",fontWeight:700}}>✓</span>}
+                  </div>
+                  <span style={{fontSize:14,color:"#444",transform:isExp?"rotate(180deg)":"none",display:"inline-block",transition:"transform .2s"}}>▾</span>
+                </div>
+                {isExp&&(
+                  <div style={{marginTop:10}}>
+                    <textarea className="input" style={{fontSize:13.5}} value={current} placeholder={`Describe your ${field.label.toLowerCase()}…`} onChange={e=>setWfEdits(ed=>({...ed,[field.key]:e.target.value}))}/>
+                    {Object.keys(wfEdits).length>0&&<button className="btn btn-ghost btn-full btn-sm" style={{marginTop:8,color:"#60d060",borderColor:"#2a3a2a"}} onClick={saveWorkflow}>💾 Save</button>}
+                  </div>
+                )}
+                {!isExp&&isFilled&&<div style={{fontSize:12,color:"var(--text3)",marginTop:6,overflow:"hidden",display:"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical"}}>{current}</div>}
               </div>
-            </>
-          )}
-
-          {/* MODALS */}
-          {showAddTask&&<MTaskModal clients={clients} onClose={()=>setShowAddTask(false)} onSave={t=>{setTasks(ts=>[...ts,{...t,id:uid(),done:false}]);setShowAddTask(false);}}/>}
-          {editTask&&<MTaskModal clients={clients} task={editTask} isEdit onClose={()=>setEditTask(null)} onSave={t=>{setTasks(ts=>ts.map(x=>x.id===t.id?t:x));setEditTask(null);}}/>}
-          {showAddRenewal&&<MRenewalModal clients={clients} onClose={()=>setShowAddRenewal(false)} onSave={r=>{setRenewals(rs=>[...rs,{...r,id:uid(),status:"upcoming"}]);setShowAddRenewal(false);}}/>}
-          {showAddClient&&<MClientModal onClose={()=>setShowAddClient(false)} onSave={c=>{setClients(cs=>[...cs,{...c,id:uid()}]);setShowAddClient(false);}}/>}
-
-          {/* FAB */}
-          {!aiOpen&&(view==="tasks"||view==="renewals"||view==="clients")&&(
-            <button onClick={()=>{if(view==="tasks")setShowAddTask(true);else if(view==="renewals")setShowAddRenewal(true);else setShowAddClient(true);}}
-              style={{position:"fixed",bottom:82,right:18,width:52,height:52,borderRadius:16,background:"#e8c858",color:"#0d0d10",fontSize:26,border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",boxShadow:"0 4px 20px rgba(232,200,88,.35)",zIndex:40}}>+</button>
-          )}
+            );
+          })}
         </div>
-      );
-    }
+      )}
+    </div>
+  );
 
-    // ─── Sub-components ─────────────────────────────────────────────────────────
-    function MTaskRow({task,clients,onToggle,onDelete,onEdit}){
-      const cat=CATEGORIES[task.category]||CATEGORIES.admin;
-      const pri=PRIORITIES[task.priority]||PRIORITIES.medium;
-      const d=daysUntil(task.dueDate);
-      const dl=dayLabel(d);
-      const cl=clients.find(c=>c.id===task.clientId);
-      return(
-        <div className="card-sm" style={{display:"flex",alignItems:"flex-start",gap:10,opacity:task.done?.4:1}}>
-          <div className={`cb${task.done?" on":""}`} style={{marginTop:2}} onClick={()=>onToggle(task.id)}>
-            {task.done&&<span style={{fontSize:10,color:"#0d0d10",fontWeight:900}}>✓</span>}
+  const viewTitle = NAV_ITEMS.find(n=>n.key===view)?.label||"WorkDesk";
+  const timeStr = now.toLocaleTimeString("en-MY",{hour:"2-digit",minute:"2-digit"});
+  const statusColor = isLunch?"#ffb547":isOffice?"var(--green)":"var(--text3)";
+  const statusLabel = isLunch?"🍽 Lunch":isOffice?"🏢 In Office":"🌙 Off Hours";
+
+  return(
+    <div className="app">
+      <style>{CSS}</style>
+
+      {/* ══ DESKTOP LAYOUT ══ */}
+      <nav className="sidebar">
+        <div className="sidebar-logo">
+          <div className="sidebar-logo-icon">⚡</div>
+          <span className="sidebar-logo-text">WorkDesk</span>
+        </div>
+        <div className="sidebar-nav">
+          {NAV_ITEMS.map(n=>(
+            <button key={n.key} className={`sidebar-item${view===n.key?" active":""}`} onClick={()=>setView(n.key)}>
+              <span className="nav-icon">{n.icon}</span>
+              {n.label}
+            </button>
+          ))}
+        </div>
+        <div className="sidebar-footer">
+          <div className="sidebar-time">
+            <span style={{color:statusColor}}>{statusLabel}</span>
+            <span style={{color:"var(--text3)",marginLeft:6}}>{timeStr}</span>
           </div>
-          <div style={{flex:1,minWidth:0}}>
-            <div style={{fontWeight:600,fontSize:14.5,color:task.done?"#444":"#dcd8f4",textDecoration:task.done?"line-through":"none",marginBottom:5,lineHeight:1.3}}>{task.title}</div>
-            <div style={{display:"flex",gap:5,flexWrap:"wrap",marginBottom:5}}>
-              <span className="pill" style={{background:cat.bg,color:cat.color}}>{cat.icon} {cat.label}</span>
-              <span className="pill" style={{background:"#1a1014",color:pri.color}}>● {pri.label}</span>
-            </div>
-            <div style={{fontSize:12.5,color:"#555",display:"flex",gap:8,flexWrap:"wrap"}}>
-              <span>📅 {fmtDate(task.dueDate)}{task.time?` · ${task.time}`:""}</span>
-              {cl&&<span>👤 {cl.name}</span>}
-              {!task.done&&<span style={{color:dl.color,fontWeight:600}}>{dl.text}</span>}
-            </div>
-          </div>
-          <div style={{display:"flex",flexDirection:"column",gap:5,flexShrink:0}}>
-            <button className="btn btn-ghost btn-sm" style={{padding:"5px 9px",fontSize:12}} onClick={()=>onEdit(task)}>✏️</button>
-            <button className="btn btn-red btn-sm" style={{padding:"5px 9px",fontSize:12}} onClick={()=>onDelete(task.id)}>✕</button>
+          <button className="sidebar-ai-btn" onClick={()=>setAiOpen(o=>!o)}>
+            ✦ AI Assistant
+            <span style={{fontSize:10,background:"rgba(255,255,255,.08)",borderRadius:8,padding:"1px 6px",color:wfPct>=80?"#60c860":"#887030"}}>{wfPct}%</span>
+          </button>
+        </div>
+      </nav>
+
+      <div className="main-area">
+        {!isOnline&&<div className="offline-banner">📴 Offline — All data saved locally. AI features paused.</div>}
+        <div className="desktop-topbar">
+          <span className="desktop-topbar-title">{viewTitle}</span>
+          <div style={{display:"flex",gap:8}}>
+            {(view==="tasks"||view==="renewals"||view==="clients")&&(
+              <button className="btn btn-gold btn-sm" onClick={()=>{if(view==="tasks")setShowAddTask(true);else if(view==="renewals")setShowAddRenewal(true);else setShowAddClient(true);}}>+ Add</button>
+            )}
           </div>
         </div>
-      );
-    }
+        <div className="desktop-content">
+          {pageContent}
+        </div>
+      </div>
 
-    function MTaskModal({clients,task,onClose,onSave,isEdit}){
-      const [f,setF]=useState(task||{title:"",category:"tax",priority:"medium",dueDate:"",time:"",clientId:"",notes:""});
-      const s=(k,v)=>setF(x=>({...x,[k]:v}));
-      return(
-        <div className="modal-bg" onClick={e=>e.target===e.currentTarget&&onClose()}>
-          <div className="modal">
-            <div className="modal-header">
-              <h2 style={{fontFamily:"'Playfair Display',serif",fontSize:20}}>{isEdit?"Edit Task":"New Task"}</h2>
-              <button className="btn btn-ghost btn-sm" style={{padding:"5px 11px"}} onClick={onClose}>✕</button>
-            </div>
-            <div style={{display:"flex",flexDirection:"column",gap:13}}>
-              <div><div className="lbl">Title *</div><input className="input" value={f.title} onChange={e=>s("title",e.target.value)} placeholder="Task title…"/></div>
-              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
-                <div><div className="lbl">Category</div><select className="select" value={f.category} onChange={e=>s("category",e.target.value)}>{Object.entries(CATEGORIES).map(([k,v])=><option key={k} value={k}>{v.icon} {v.label}</option>)}</select></div>
-                <div><div className="lbl">Priority</div><select className="select" value={f.priority} onChange={e=>s("priority",e.target.value)}>{Object.entries(PRIORITIES).map(([k,v])=><option key={k} value={k}>{v.label}</option>)}</select></div>
+      {/* ══ MOBILE LAYOUT ══ */}
+      <div className="mobile-topbar">
+        <div style={{display:"flex",alignItems:"center",gap:8}}>
+          <div style={{width:28,height:28,background:"linear-gradient(135deg,#e8c858,#a07818)",borderRadius:7,display:"flex",alignItems:"center",justifyContent:"center",fontSize:14}}>⚡</div>
+          <span style={{fontFamily:"'Playfair Display',serif",fontSize:17,color:"var(--gold)"}}>WorkDesk</span>
+        </div>
+        <div style={{display:"flex",alignItems:"center",gap:7}}>
+          <span style={{fontSize:11,color:statusColor,background:"#111",border:"1px solid #1a1a22",padding:"3px 8px",borderRadius:10,fontWeight:600}}>{statusLabel} {timeStr}</span>
+          <button className="btn btn-ai" style={{padding:"6px 11px",fontSize:12,opacity:isOnline?1:.5}} onClick={()=>setAiOpen(o=>!o)}>✦ AI</button>
+        </div>
+      </div>
+
+      {!isOnline&&<div className="offline-banner" style={{display:"none"}} id="mob-offline">📴 Offline</div>}
+
+      <div className="mobile-scroll">
+        {!isOnline&&<div className="offline-banner" style={{margin:"-14px -16px 14px",borderRadius:0}}>📴 Offline — AI paused</div>}
+        {pageContent}
+      </div>
+
+      <nav className="bottom-nav">
+        {NAV_ITEMS.map(n=>(
+          <button key={n.key} className={`tab-btn${view===n.key?" active":""}`} onClick={()=>setView(n.key)}>
+            <span className="tab-icon">{n.icon}</span>
+            <span className="tab-label">{n.label}</span>
+          </button>
+        ))}
+      </nav>
+
+      {/* FAB — mobile only */}
+      {!aiOpen&&(view==="tasks"||view==="renewals"||view==="clients")&&(
+        <button className="fab" onClick={()=>{if(view==="tasks")setShowAddTask(true);else if(view==="renewals")setShowAddRenewal(true);else setShowAddClient(true);}}>+</button>
+      )}
+
+      {/* ══ AI PANEL ══ */}
+      {aiOpen&&(
+        <>
+          <div className="ai-overlay" onClick={()=>setAiOpen(false)}/>
+          <div className="ai-panel">
+            <div className="ai-handle"/>
+            <div className="ai-header">
+              <div style={{display:"flex",alignItems:"center",gap:7}}>
+                <span style={{background:"linear-gradient(135deg,#2a1f5a,#1a3a5a)",border:"1px solid #3a2a7a",borderRadius:12,padding:"2px 8px",fontSize:10,color:"#a090ff",fontWeight:700}}>✦ AI</span>
+                <span style={{fontFamily:"'Playfair Display',serif",fontSize:15,color:"#b8aaf8"}}>Assistant</span>
+                {!isOnline&&<span style={{fontSize:10,color:"#e8a838",background:"#1a1008",border:"1px solid #2a2008",borderRadius:10,padding:"1px 7px",fontWeight:600}}>Offline</span>}
               </div>
-              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
-                <div><div className="lbl">Due Date *</div><input className="input" type="date" value={f.dueDate} onChange={e=>s("dueDate",e.target.value)}/></div>
-                <div><div className="lbl">Time</div><input className="input" type="time" value={f.time} onChange={e=>s("time",e.target.value)}/></div>
-              </div>
-              <div><div className="lbl">Client</div><select className="select" value={f.clientId} onChange={e=>s("clientId",e.target.value)}><option value="">— None —</option>{clients.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select></div>
-              <div><div className="lbl">Notes</div><textarea className="input" value={f.notes} onChange={e=>s("notes",e.target.value)} placeholder="Details…"/></div>
+              <button className="btn btn-ghost btn-sm" style={{padding:"5px 10px"}} onClick={()=>setAiOpen(false)}>✕</button>
             </div>
-            <div style={{display:"flex",gap:9,marginTop:18}}>
-              <button className="btn btn-ghost" style={{flex:1}} onClick={onClose}>Cancel</button>
-              <button className="btn btn-gold" style={{flex:2}} onClick={()=>f.title&&f.dueDate&&onSave(f)}>{isEdit?"Save Changes":"Add Task"}</button>
+            <div className="ai-tabs">
+              {[["chat","💬 Chat"],["briefing","📋 Brief"],["email","✉️ Email"],["suggest","💡 Tasks"]].map(([k,l])=>(
+                <button key={k} className="ai-tab" onClick={()=>setAiTab(k)} style={{borderBottom:`2px solid ${aiTab===k?"#6858c8":"transparent"}`,color:aiTab===k?"#a898f0":"#555"}}>{l}</button>
+              ))}
+            </div>
+            <div style={{flex:1,overflow:"hidden",display:"flex",flexDirection:"column"}}>
+              {aiTab==="chat"&&(
+                <>
+                  <div style={{flex:1,overflowY:"auto",padding:"12px 14px",display:"flex",flexDirection:"column",gap:8}}>
+                    {chatHistory.map((m,i)=><div key={i} className={`ai-bubble ${m.role}`}>{m.content}</div>)}
+                    {aiLoading&&<div className="ai-bubble assistant" style={{display:"flex",gap:5}}><span className="typing-dot"/><span className="typing-dot"/><span className="typing-dot"/></div>}
+                    <div ref={chatEndRef}/>
+                  </div>
+                  <div style={{padding:"0 12px 4px",display:"flex",gap:6,overflowX:"auto"}}>
+                    {["What's urgent today?","Any overdue?","Next renewal?"].map(p=>(
+                      <button key={p} onClick={()=>setChatInput(p)} style={{flexShrink:0,background:"#10101a",border:"1px solid #1c1c2c",borderRadius:14,padding:"5px 10px",fontSize:11.5,color:"#555",cursor:"pointer",fontFamily:"inherit"}}>{p}</button>
+                    ))}
+                  </div>
+                  <div style={{padding:"10px 12px",borderTop:"1px solid #181828",display:"flex",gap:8,paddingBottom:"calc(10px + env(safe-area-inset-bottom))"}}>
+                    <input className="input" style={{fontSize:13.5,padding:"10px 12px"}} placeholder={isOnline?"Ask anything…":"Offline — AI paused"} value={chatInput} onChange={e=>setChatInput(e.target.value)} onKeyDown={e=>{if(e.key==="Enter"){e.preventDefault();sendChat();}}} disabled={!isOnline}/>
+                    <button className="btn btn-gold" style={{padding:"10px 14px",flexShrink:0}} onClick={sendChat} disabled={aiLoading||!isOnline}>↑</button>
+                  </div>
+                </>
+              )}
+              {aiTab==="briefing"&&(
+                <div style={{flex:1,overflowY:"auto",padding:"14px",display:"flex",flexDirection:"column",gap:10}}>
+                  <p style={{fontSize:13,color:"#666",lineHeight:1.55}}>AI generates a personalised daily briefing based on your workflow and current tasks.</p>
+                  <button className="btn btn-gold btn-full" onClick={genBriefing} disabled={aiLoading||!isOnline}>{aiLoading?"Generating…":!isOnline?"Offline":"📋 Generate Daily Briefing"}</button>
+                  {aiLoading&&!briefing&&<div style={{display:"flex",gap:5,justifyContent:"center",padding:16}}><span className="typing-dot"/><span className="typing-dot"/><span className="typing-dot"/></div>}
+                  {briefing&&<div className="ai-bubble assistant">{briefing}</div>}
+                </div>
+              )}
+              {aiTab==="email"&&(
+                <div style={{flex:1,overflowY:"auto",padding:"14px",display:"flex",flexDirection:"column",gap:11}}>
+                  <p style={{fontSize:13,color:"#666",lineHeight:1.5}}>AI drafts emails matching your communication style.</p>
+                  <div><div className="lbl">Client</div>
+                    <select className="select" value={emailCtx.clientId} onChange={e=>setEmailCtx(x=>({...x,clientId:e.target.value}))}>
+                      <option value="">— Select client —</option>
+                      {clients.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
+                    </select>
+                  </div>
+                  <div><div className="lbl">Purpose</div>
+                    <textarea className="input" placeholder="e.g. Renewal invoice for GoDaddy RM280 due April 15" value={emailCtx.purpose} onChange={e=>setEmailCtx(x=>({...x,purpose:e.target.value}))}/>
+                  </div>
+                  <button className="btn btn-gold btn-full" onClick={genEmail} disabled={aiLoading||!emailCtx.clientId||!emailCtx.purpose||!isOnline}>{aiLoading?"Drafting…":!isOnline?"Offline":"✦ Draft with AI"}</button>
+                  {emailDraft&&<><div className="ai-bubble assistant">{emailDraft}</div><button className="btn btn-ghost btn-full" onClick={()=>navigator.clipboard?.writeText(emailDraft)}>📋 Copy</button></>}
+                </div>
+              )}
+              {aiTab==="suggest"&&(
+                <div style={{flex:1,overflowY:"auto",padding:"14px",display:"flex",flexDirection:"column",gap:10}}>
+                  <p style={{fontSize:13,color:"#666",lineHeight:1.5}}>AI suggests tasks based on your routines.</p>
+                  <button className="btn btn-gold btn-full" onClick={genSuggestions} disabled={aiLoading||!isOnline}>{aiLoading?"Analysing…":!isOnline?"Offline":"💡 Suggest Tasks"}</button>
+                  {suggestions.map((s,i)=>{
+                    const cat=CATEGORIES[s.category]||CATEGORIES.admin;
+                    const pri=PRIORITIES[s.priority]||PRIORITIES.medium;
+                    return(
+                      <div key={i} className="card-sm">
+                        <div style={{fontWeight:600,fontSize:14,marginBottom:6}}>{s.title}</div>
+                        <div style={{display:"flex",gap:5,marginBottom:6,flexWrap:"wrap"}}>
+                          <span className="pill" style={{background:cat.bg,color:cat.color}}>{cat.icon} {cat.label}</span>
+                          <span className="pill" style={{background:"#1a1014",color:pri.color}}>● {pri.label}</span>
+                        </div>
+                        {s.reason&&<div style={{fontSize:12,color:"#6858a8",fontStyle:"italic",marginBottom:6}}>✦ {s.reason}</div>}
+                        <button className="btn btn-gold btn-sm" onClick={()=>addSuggested(s)}>+ Add to Tasks</button>
+                      </div>
+                    );
+                  })}
+                  {!aiLoading&&suggestions.length===0&&<div style={{color:"#333",fontSize:13,textAlign:"center",padding:"16px 0"}}>Tap above to get AI suggestions.</div>}
+                </div>
+              )}
             </div>
           </div>
-        </div>
-      );
-    }
+        </>
+      )}
 
-    function MRenewalModal({clients,onClose,onSave}){
-      const [f,setF]=useState({clientId:"",service:"",cost:"",billingAmount:"",renewalDate:"",notes:""});
-      const s=(k,v)=>setF(x=>({...x,[k]:v}));
-      const profit=(parseFloat(f.billingAmount)||0)-(parseFloat(f.cost)||0);
-      return(
-        <div className="modal-bg" onClick={e=>e.target===e.currentTarget&&onClose()}>
-          <div className="modal">
-            <div className="modal-header">
-              <h2 style={{fontFamily:"'Playfair Display',serif",fontSize:20}}>New Renewal</h2>
-              <button className="btn btn-ghost btn-sm" style={{padding:"5px 11px"}} onClick={onClose}>✕</button>
-            </div>
-            <div style={{display:"flex",flexDirection:"column",gap:13}}>
-              <div><div className="lbl">Client *</div><select className="select" value={f.clientId} onChange={e=>s("clientId",e.target.value)}><option value="">— Select —</option>{clients.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select></div>
-              <div><div className="lbl">Service *</div><input className="input" value={f.service} onChange={e=>s("service",e.target.value)} placeholder="e.g. GoDaddy Email Hosting"/></div>
-              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
-                <div><div className="lbl">Your Cost (RM)</div><input className="input" type="number" value={f.cost} onChange={e=>s("cost",e.target.value)}/></div>
-                <div><div className="lbl">Bill Client (RM)</div><input className="input" type="number" value={f.billingAmount} onChange={e=>s("billingAmount",e.target.value)}/></div>
-              </div>
-              {f.billingAmount&&<div style={{background:"#08080d",borderRadius:8,padding:"10px 12px",fontSize:14,color:"#57ff9c"}}>Profit: <strong>RM {profit.toFixed(2)}</strong></div>}
-              <div><div className="lbl">Renewal Date *</div><input className="input" type="date" value={f.renewalDate} onChange={e=>s("renewalDate",e.target.value)}/></div>
-              <div><div className="lbl">Notes</div><input className="input" value={f.notes} onChange={e=>s("notes",e.target.value)} placeholder="e.g. 5 licenses"/></div>
-            </div>
-            <div style={{display:"flex",gap:9,marginTop:18}}>
-              <button className="btn btn-ghost" style={{flex:1}} onClick={onClose}>Cancel</button>
-              <button className="btn btn-gold" style={{flex:2}} onClick={()=>f.clientId&&f.service&&f.renewalDate&&onSave({...f,cost:parseFloat(f.cost)||0,billingAmount:parseFloat(f.billingAmount)||0})}>Add Renewal</button>
-            </div>
+      {/* ══ MODALS ══ */}
+      {showAddTask&&<TaskModal clients={clients} onClose={()=>setShowAddTask(false)} onSave={t=>{setTasks(ts=>[...ts,{...t,id:uid(),done:false}]);setShowAddTask(false);}}/>}
+      {editTask&&<TaskModal clients={clients} task={editTask} isEdit onClose={()=>setEditTask(null)} onSave={t=>{setTasks(ts=>ts.map(x=>x.id===t.id?t:x));setEditTask(null);}}/>}
+      {showAddRenewal&&<RenewalModal clients={clients} onClose={()=>setShowAddRenewal(false)} onSave={r=>{setRenewals(rs=>[...rs,{...r,id:uid(),status:"upcoming"}]);setShowAddRenewal(false);}}/>}
+      {showAddClient&&<ClientModal onClose={()=>setShowAddClient(false)} onSave={c=>{setClients(cs=>[...cs,{...c,id:uid()}]);setShowAddClient(false);}}/>}
+    </div>
+  );
+}
+
+// ─── Sub-components ──────────────────────────────────────────────────────────
+function TaskRow({task,clients,onToggle,onDelete,onEdit}){
+  const cat=CATEGORIES[task.category]||CATEGORIES.admin;
+  const pri=PRIORITIES[task.priority]||PRIORITIES.medium;
+  const d=daysUntil(task.dueDate);
+  const dl=dayLabel(d);
+  const cl=clients.find(c=>c.id===task.clientId);
+  return(
+    <div className="card-sm" style={{display:"flex",alignItems:"flex-start",gap:10,opacity:task.done?.4:1}}>
+      <div className={`cb${task.done?" on":""}`} style={{marginTop:2}} onClick={()=>onToggle(task.id)}>
+        {task.done&&<span style={{fontSize:10,color:"#0d0d10",fontWeight:900}}>✓</span>}
+      </div>
+      <div style={{flex:1,minWidth:0}}>
+        <div style={{fontWeight:600,fontSize:14,color:task.done?"#444":"var(--text)",textDecoration:task.done?"line-through":"none",marginBottom:5,lineHeight:1.3}}>{task.title}</div>
+        <div style={{display:"flex",gap:5,flexWrap:"wrap",marginBottom:4}}>
+          <span className="pill" style={{background:cat.bg,color:cat.color}}>{cat.icon} {cat.label}</span>
+          <span className="pill" style={{background:"#1a1014",color:pri.color}}>● {pri.label}</span>
+        </div>
+        <div style={{fontSize:12,color:"var(--text3)",display:"flex",gap:8,flexWrap:"wrap"}}>
+          <span>📅 {fmtDate(task.dueDate)}{task.time?` · ${task.time}`:""}</span>
+          {cl&&<span>👤 {cl.name}</span>}
+          {!task.done&&<span style={{color:dl.color,fontWeight:600}}>{dl.text}</span>}
+        </div>
+      </div>
+      <div style={{display:"flex",gap:5,flexShrink:0}}>
+        <button className="btn btn-ghost btn-sm" style={{padding:"5px 8px",fontSize:12}} onClick={()=>onEdit(task)}>✏️</button>
+        <button className="btn btn-red btn-sm" style={{padding:"5px 8px",fontSize:12}} onClick={()=>onDelete(task.id)}>✕</button>
+      </div>
+    </div>
+  );
+}
+
+function TaskModal({clients,task,onClose,onSave,isEdit}){
+  const [f,setF]=useState(task||{title:"",category:"tax",priority:"medium",dueDate:"",time:"",clientId:"",notes:""});
+  const s=(k,v)=>setF(x=>({...x,[k]:v}));
+  return(
+    <div className="modal-bg" onClick={e=>e.target===e.currentTarget&&onClose()}>
+      <div className="modal modal-border-mobile">
+        <div className="modal-header">
+          <h2 style={{fontFamily:"'Playfair Display',serif",fontSize:20}}>{isEdit?"Edit Task":"New Task"}</h2>
+          <button className="btn btn-ghost btn-sm" style={{padding:"5px 10px"}} onClick={onClose}>✕</button>
+        </div>
+        <div style={{display:"flex",flexDirection:"column",gap:12}}>
+          <div><div className="lbl">Title *</div><input className="input" value={f.title} onChange={e=>s("title",e.target.value)} placeholder="Task title…"/></div>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+            <div><div className="lbl">Category</div><select className="select" value={f.category} onChange={e=>s("category",e.target.value)}>{Object.entries(CATEGORIES).map(([k,v])=><option key={k} value={k}>{v.icon} {v.label}</option>)}</select></div>
+            <div><div className="lbl">Priority</div><select className="select" value={f.priority} onChange={e=>s("priority",e.target.value)}>{Object.entries(PRIORITIES).map(([k,v])=><option key={k} value={k}>{v.label}</option>)}</select></div>
           </div>
-        </div>
-      );
-    }
-
-    function MClientModal({onClose,onSave}){
-      const [f,setF]=useState({name:"",email:"",type:"tax"});
-      const s=(k,v)=>setF(x=>({...x,[k]:v}));
-      return(
-        <div className="modal-bg" onClick={e=>e.target===e.currentTarget&&onClose()}>
-          <div className="modal">
-            <div className="modal-header">
-              <h2 style={{fontFamily:"'Playfair Display',serif",fontSize:20}}>New Client</h2>
-              <button className="btn btn-ghost btn-sm" style={{padding:"5px 11px"}} onClick={onClose}>✕</button>
-            </div>
-            <div style={{display:"flex",flexDirection:"column",gap:13}}>
-              <div><div className="lbl">Name *</div><input className="input" value={f.name} onChange={e=>s("name",e.target.value)} placeholder="Client or company name"/></div>
-              <div><div className="lbl">Email</div><input className="input" type="email" value={f.email} onChange={e=>s("email",e.target.value)} placeholder="email@example.com"/></div>
-              <div><div className="lbl">Type</div><select className="select" value={f.type} onChange={e=>s("type",e.target.value)}><option value="tax">📋 Tax Client</option><option value="web">🌐 Web Client</option></select></div>
-            </div>
-            <div style={{display:"flex",gap:9,marginTop:18}}>
-              <button className="btn btn-ghost" style={{flex:1}} onClick={onClose}>Cancel</button>
-              <button className="btn btn-gold" style={{flex:2}} onClick={()=>f.name&&onSave(f)}>Add Client</button>
-            </div>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+            <div><div className="lbl">Due Date *</div><input className="input" type="date" value={f.dueDate} onChange={e=>s("dueDate",e.target.value)}/></div>
+            <div><div className="lbl">Time</div><input className="input" type="time" value={f.time} onChange={e=>s("time",e.target.value)}/></div>
           </div>
+          <div><div className="lbl">Client</div><select className="select" value={f.clientId} onChange={e=>s("clientId",e.target.value)}><option value="">— None —</option>{clients.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select></div>
+          <div><div className="lbl">Notes</div><textarea className="input" value={f.notes} onChange={e=>s("notes",e.target.value)} placeholder="Details…"/></div>
         </div>
-      );
-    }
+        <div style={{display:"flex",gap:9,marginTop:18}}>
+          <button className="btn btn-ghost" style={{flex:1}} onClick={onClose}>Cancel</button>
+          <button className="btn btn-gold" style={{flex:2}} onClick={()=>f.title&&f.dueDate&&onSave(f)}>{isEdit?"Save Changes":"Add Task"}</button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
-    // ─── Register Service Worker & Mount ────────────────────────────────────────
-    if ("serviceWorker" in navigator) {
-      window.addEventListener("load", () => {
-        navigator.serviceWorker.register("sw.js")
-          .then(reg => console.log("SW registered:", reg.scope))
-          .catch(err => console.log("SW failed:", err));
-      });
-    }
+function RenewalModal({clients,onClose,onSave}){
+  const [f,setF]=useState({clientId:"",service:"",cost:"",billingAmount:"",renewalDate:"",notes:""});
+  const s=(k,v)=>setF(x=>({...x,[k]:v}));
+  const profit=(parseFloat(f.billingAmount)||0)-(parseFloat(f.cost)||0);
+  return(
+    <div className="modal-bg" onClick={e=>e.target===e.currentTarget&&onClose()}>
+      <div className="modal modal-border-mobile">
+        <div className="modal-header">
+          <h2 style={{fontFamily:"'Playfair Display',serif",fontSize:20}}>New Renewal</h2>
+          <button className="btn btn-ghost btn-sm" style={{padding:"5px 10px"}} onClick={onClose}>✕</button>
+        </div>
+        <div style={{display:"flex",flexDirection:"column",gap:12}}>
+          <div><div className="lbl">Client *</div><select className="select" value={f.clientId} onChange={e=>s("clientId",e.target.value)}><option value="">— Select —</option>{clients.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select></div>
+          <div><div className="lbl">Service *</div><input className="input" value={f.service} onChange={e=>s("service",e.target.value)} placeholder="e.g. GoDaddy Email Hosting"/></div>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+            <div><div className="lbl">Your Cost (RM)</div><input className="input" type="number" value={f.cost} onChange={e=>s("cost",e.target.value)}/></div>
+            <div><div className="lbl">Bill Client (RM)</div><input className="input" type="number" value={f.billingAmount} onChange={e=>s("billingAmount",e.target.value)}/></div>
+          </div>
+          {f.billingAmount&&<div style={{background:"#08080d",borderRadius:8,padding:"10px 12px",fontSize:14,color:"var(--green)"}}>Profit: <strong>RM {profit.toFixed(2)}</strong></div>}
+          <div><div className="lbl">Renewal Date *</div><input className="input" type="date" value={f.renewalDate} onChange={e=>s("renewalDate",e.target.value)}/></div>
+          <div><div className="lbl">Notes</div><input className="input" value={f.notes} onChange={e=>s("notes",e.target.value)} placeholder="e.g. 5 licenses"/></div>
+        </div>
+        <div style={{display:"flex",gap:9,marginTop:18}}>
+          <button className="btn btn-ghost" style={{flex:1}} onClick={onClose}>Cancel</button>
+          <button className="btn btn-gold" style={{flex:2}} onClick={()=>f.clientId&&f.service&&f.renewalDate&&onSave({...f,cost:parseFloat(f.cost)||0,billingAmount:parseFloat(f.billingAmount)||0})}>Add Renewal</button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
-    ReactDOM.createRoot(document.getElementById("root")).render(<App />);
-  </script>
+function ClientModal({onClose,onSave}){
+  const [f,setF]=useState({name:"",email:"",type:"tax"});
+  const s=(k,v)=>setF(x=>({...x,[k]:v}));
+  return(
+    <div className="modal-bg" onClick={e=>e.target===e.currentTarget&&onClose()}>
+      <div className="modal modal-border-mobile">
+        <div className="modal-header">
+          <h2 style={{fontFamily:"'Playfair Display',serif",fontSize:20}}>New Client</h2>
+          <button className="btn btn-ghost btn-sm" style={{padding:"5px 10px"}} onClick={onClose}>✕</button>
+        </div>
+        <div style={{display:"flex",flexDirection:"column",gap:12}}>
+          <div><div className="lbl">Name *</div><input className="input" value={f.name} onChange={e=>s("name",e.target.value)} placeholder="Client or company name"/></div>
+          <div><div className="lbl">Email</div><input className="input" type="email" value={f.email} onChange={e=>s("email",e.target.value)} placeholder="email@example.com"/></div>
+          <div><div className="lbl">Type</div><select className="select" value={f.type} onChange={e=>s("type",e.target.value)}><option value="tax">📋 Tax Client</option><option value="web">🌐 Web Client</option></select></div>
+        </div>
+        <div style={{display:"flex",gap:9,marginTop:18}}>
+          <button className="btn btn-ghost" style={{flex:1}} onClick={onClose}>Cancel</button>
+          <button className="btn btn-gold" style={{flex:2}} onClick={()=>f.name&&onSave(f)}>Add Client</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// SW registration
+if("serviceWorker" in navigator){
+  window.addEventListener("load",()=>{
+    navigator.serviceWorker.register("sw.js").catch(()=>{});
+  });
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+</script>
 </body>
 </html>
