@@ -125,6 +125,7 @@ const NAV_ITEMS = [
   { key:"renewals", icon:"🔄", label:"Renewals" },
   { key:"clients",  icon:"👥", label:"Clients" },
   { key:"workflow", icon:"🧠", label:"Workflow" },
+  { key:"settings", icon:"⚙️", label:"Settings" },
 ];
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -151,10 +152,10 @@ async function callClaude(messages,system=""){
   const data=await res.json();
   return data.content?.map(b=>b.text||"").join("")||"No response.";
 }
-function buildSystemPrompt(tasks,clients,renewals,workflow){
+function buildSystemPrompt(tasks,clients,renewals,workflow,settings){
   const today=new Date().toISOString().split("T")[0];
   const wf=WORKFLOW_FIELDS.filter(f=>workflow[f.key]?.trim()).map(f=>`${f.icon} ${f.label}:\n${workflow[f.key]}`).join("\n\n");
-  return `You are a personalised AI work assistant for a Malaysian Senior Tax Executive who also runs a web design side business.
+  return `You are a personalised AI work assistant${settings?.name?" for "+settings.name:""} ${settings?.company?"at "+settings.company+",":","} a Malaysian Senior Tax Executive who also runs a web design side business.
 TODAY: ${today}
 WORKFLOW PROFILE:\n${wf||"Not set yet."}
 CLIENTS:\n${clients.map(c=>`• ${c.name} (${c.type==="tax"?"Tax":"Web"}, ${c.email})`).join("\n")}
@@ -372,7 +373,7 @@ function App(){
   const [editClient,     setEditClient]     = useState(null);
   const [aiOpen,      setAiOpen]    = useState(false);
   const [aiTab,       setAiTab]     = useState("chat");
-  const [chatHistory, setChatHistory] = useState([{role:"assistant",content:"Hi! I'm your AI assistant. Ask me anything about your tasks, clients, or deadlines. 👋"}]);
+  const [chatHistory, setChatHistory] = useState(()=>load("wd_chat",[{role:"assistant",content:"Hi! I'm your AI assistant. Ask me anything about your tasks, clients, or deadlines. 👋"}]));
   const [chatInput,   setChatInput] = useState("");
   const [aiLoading,   setAiLoading] = useState(false);
   const [briefing,    setBriefing]  = useState("");
@@ -383,6 +384,15 @@ function App(){
   const [wfSaved,    setWfSaved]   = useState(false);
   const [wfExpanded, setWfExpanded]= useState(null);
   const chatEndRef = useRef(null);
+  const [searchQ,     setSearchQ]    = useState("");
+  const [bulkMode,    setBulkMode]   = useState(false);
+  const [bulkSel,     setBulkSel]    = useState([]);
+  const [renSort,     setRenSort]    = useState("date");
+  const [clientDetail,setClientDetail]= useState(null);
+  const [darkMode,    setDarkMode]   = useState(()=>load("wd_darkmode",true));
+  const [settings,    setSettings]   = useState(()=>load("wd_settings",{name:"",company:"",currency:"RM"}));
+  const [showSettings,setShowSettings]= useState(false);
+  const [notifGranted,setNotifGranted]= useState(false);
 
   useEffect(()=>{const t=setInterval(()=>setNow(new Date()),30000);return()=>clearInterval(t);},[]);
   useEffect(()=>{
@@ -394,7 +404,44 @@ function App(){
   useEffect(()=>{try{localStorage.setItem("wd_clients", JSON.stringify(clients));}catch{}},[clients]);
   useEffect(()=>{try{localStorage.setItem("wd_renewals",JSON.stringify(renewals));}catch{}},[renewals]);
   useEffect(()=>{try{localStorage.setItem("wd_workflow",JSON.stringify(workflow));}catch{}},[workflow]);
+  useEffect(()=>{try{localStorage.setItem("wd_darkmode",JSON.stringify(darkMode));}catch{}},[darkMode]);
+  useEffect(()=>{try{localStorage.setItem("wd_settings",JSON.stringify(settings));}catch{}},[settings]);
+
+  // Notification: check renewals + daily briefing
+  useEffect(()=>{
+    if(!("Notification" in window)||Notification.permission!=="granted")return;
+    const lastNotif=localStorage.getItem("wd_last_notif");
+    const todayStr=new Date().toISOString().split("T")[0];
+    if(lastNotif===todayStr)return;
+    localStorage.setItem("wd_last_notif",todayStr);
+    // Renewal reminders
+    const urgent=renewals.filter(r=>r.status!=="done"&&daysUntil(r.renewalDate)<=7&&daysUntil(r.renewalDate)>=0);
+    urgent.forEach(r=>{
+      const cl=clients.find(c=>c.id===r.clientId);
+      const d=daysUntil(r.renewalDate);
+      setTimeout(()=>{
+        new Notification("⚠️ Renewal Due Soon",{
+          body:`${r.service}${cl?" — "+cl.name:""} expires in ${d===0?"today":d+"d"} · RM ${r.billingAmount}`,
+          icon:"/workdesk/icons/icon-192.png"
+        });
+      },2000);
+    });
+    // Daily briefing at 9am (show if between 9-10am)
+    const h=new Date().getHours();
+    if(h>=9&&h<10){
+      const pending=tasks.filter(t=>!t.done).length;
+      const overdue=tasks.filter(t=>!t.done&&t.dueDate<todayStr).length;
+      setTimeout(()=>{
+        new Notification("☀️ Good morning — WorkDesk",{
+          body:`${pending} tasks pending${overdue>0?`, ${overdue} overdue`:""}.${urgent.length>0?` ${urgent.length} renewal${urgent.length>1?"s":""} expiring soon.`:""}`,
+          icon:"/workdesk/icons/icon-192.png"
+        });
+      },3000);
+    }
+    setNotifGranted(Notification.permission==="granted");
+  },[]);
   useEffect(()=>{chatEndRef.current?.scrollIntoView({behavior:"smooth"});},[chatHistory,aiLoading]);
+  useEffect(()=>{try{localStorage.setItem("wd_chat",JSON.stringify(chatHistory.slice(-40)));}catch{}},[chatHistory]);
 
   const today   = now.toISOString().split("T")[0];
   const hour    = now.getHours();
@@ -410,12 +457,17 @@ function App(){
   const deleteTask  = id=>setTasks(ts=>ts.filter(t=>t.id!==id));
   const markRenDone   = id=>setRenewals(rs=>rs.map(r=>r.id===id?{...r,status:"done"}:r));
   const unmarkRenDone = id=>setRenewals(rs=>rs.map(r=>r.id===id?{...r,status:"upcoming"}:r));
-  const deleteRenewal = id=>{ if(window.confirm("Delete this renewal?")) setRenewals(rs=>rs.filter(r=>r.id!==id)); };
+  const archiveRenewal = id=>setRenewals(rs=>rs.map(r=>r.id===id?{...r,status:"archived"}:r));
+  const deleteRenewal = id=>{ if(window.confirm("Permanently delete this renewal?")) setRenewals(rs=>rs.filter(r=>r.id!==id)); };
   const saveEditRenewal = (id,data)=>{ setRenewals(rs=>rs.map(r=>r.id===id?{...r,...data}:r)); setEditRenewal(null); };
+  const bulkComplete = ()=>{ setTasks(ts=>ts.map(t=>bulkSel.includes(t.id)?{...t,done:true}:t)); setBulkSel([]); setBulkMode(false); };
+  const toggleBulkSel = id=>setBulkSel(s=>s.includes(id)?s.filter(x=>x!==id):[...s,id]);
   const deleteClient = id=>{ if(window.confirm("Delete this client? Their tasks and renewals will stay but become unlinked.")) setClients(cs=>cs.filter(c=>c.id!==id)); };
-  const sys = buildSystemPrompt(tasks,clients,renewals,workflow);
+  const sys = buildSystemPrompt(tasks,clients,renewals,workflow,settings);
   const saveWorkflow=()=>{setWorkflow(w=>({...w,...wfEdits}));setWfEdits({});setWfSaved(true);setTimeout(()=>setWfSaved(false),2200);};
   const filteredTasks=tasks.filter(t=>{
+    const q=searchQ.toLowerCase();
+    if(q&&!t.title.toLowerCase().includes(q)&&!t.notes?.toLowerCase().includes(q))return false;
     if(filterCat==="all")return true;
     if(filterCat==="done")return t.done;
     return t.category===filterCat&&!t.done;
@@ -543,10 +595,21 @@ function App(){
         <div>
           <div className="page-header">
             <h1 className="page-title">Tasks</h1>
-            <div style={{display:"flex",gap:8}}>
+            <div style={{display:"flex",gap:6}}>
+              <button className="btn btn-ghost btn-sm" style={{fontSize:12,padding:"6px 10px",color:bulkMode?"var(--gold)":"var(--text3)"}} onClick={()=>{setBulkMode(b=>!b);setBulkSel([]);}}>☑ Bulk</button>
               <button className="btn btn-ai btn-sm" onClick={()=>openAI("suggest",genSuggestions)}>✦ AI</button>
-              <button className="btn btn-gold btn-sm" onClick={()=>setShowAddTask(true)}>+ Add Task</button>
+              <button className="btn btn-gold btn-sm" onClick={()=>setShowAddTask(true)}>+ Add</button>
             </div>
+          </div>
+          {bulkMode&&bulkSel.length>0&&(
+            <div style={{display:"flex",gap:8,marginBottom:10,padding:"10px 12px",background:"#0e1a0e",borderRadius:10,border:"1px solid #1a2e1a",alignItems:"center"}}>
+              <span style={{flex:1,fontSize:13,color:"var(--green)"}}>{bulkSel.length} selected</span>
+              <button className="btn btn-ghost btn-sm" style={{color:"var(--green)",borderColor:"#1a2e1a"}} onClick={bulkComplete}>✓ Mark all done</button>
+              <button className="btn btn-ghost btn-sm" style={{color:"var(--text3)"}} onClick={()=>{setBulkSel([]);setBulkMode(false);}}>Cancel</button>
+            </div>
+          )}
+          <div style={{marginBottom:12}}>
+            <input className="input" style={{fontSize:13}} placeholder="Search tasks…" value={searchQ} onChange={e=>setSearchQ(e.target.value)}/>
           </div>
           <div className="chips">
             {[["all","All"],["done","Done ✓"],["tax","📋 Tax"],["web","🌐 Web"],["social","📱 Social"],["billing","💰 Billing"],["admin","📁 Admin"]].map(([k,l])=>(
@@ -555,7 +618,12 @@ function App(){
           </div>
           {filteredTasks.length===0
             ?<div style={{color:"#444",fontSize:14,padding:"24px 0",textAlign:"center"}}>No tasks here.</div>
-            :filteredTasks.map(t=><TaskRow key={t.id} task={t} clients={clients} onToggle={toggleDone} onDelete={deleteTask} onEdit={setEditTask}/>)}
+            :filteredTasks.map(t=>(
+              <div key={t.id} style={{display:"flex",alignItems:"flex-start",gap:8}}>
+                {bulkMode&&<div onClick={()=>toggleBulkSel(t.id)} style={{width:20,height:20,borderRadius:6,border:"2px solid",borderColor:bulkSel.includes(t.id)?"var(--green)":"var(--border)",background:bulkSel.includes(t.id)?"var(--green)":"transparent",flexShrink:0,marginTop:14,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,color:"#0d0d10",fontWeight:900}}>{bulkSel.includes(t.id)?"✓":""}</div>}
+                <div style={{flex:1}}><TaskRow task={t} clients={clients} onToggle={toggleDone} onDelete={deleteTask} onEdit={setEditTask}/></div>
+              </div>
+            ))}
         </div>
       )}
 
@@ -566,18 +634,57 @@ function App(){
             <h1 className="page-title">Renewals</h1>
             <button className="btn btn-gold btn-sm" onClick={()=>setShowAddRenewal(true)}>+ Add</button>
           </div>
+          {/* Profit summary */}
+          {renTab==="active"&&(()=>{
+const activeRens=renewals.filter(r=>r.status!=="done"&&r.status!=="archived");
+            const totalProfit=activeRens.reduce((a,r)=>a+(r.billingAmount-r.cost),0);
+            const totalBilling=activeRens.reduce((a,r)=>a+r.billingAmount,0);
+            return activeRens.length>0?(
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:12}}>
+                <div style={{background:"#0a120a",border:"1px solid #1a2e1a",borderRadius:10,padding:"10px 12px"}}>
+                  <div style={{fontSize:11,color:"var(--text3)",marginBottom:3}}>Total Billing</div>
+                  <div style={{fontSize:17,fontWeight:700,color:"var(--green)"}}>RM {totalBilling}</div>
+                </div>
+                <div style={{background:"#120a08",border:"1px solid #2e1a10",borderRadius:10,padding:"10px 12px"}}>
+                  <div style={{fontSize:11,color:"var(--text3)",marginBottom:3}}>Total Profit</div>
+                  <div style={{fontSize:17,fontWeight:700,color:"var(--gold)"}}>RM {totalProfit}</div>
+                </div>
+              </div>
+            ):null;
+          })()}
+          {/* Search + sort */}
+          <div style={{display:"flex",gap:8,marginBottom:10}}>
+            <input className="input" style={{flex:1,fontSize:13}} placeholder="Search renewals…" value={searchQ} onChange={e=>setSearchQ(e.target.value)}/>
+            <select className="select" style={{width:"auto",fontSize:12,padding:"8px 10px"}} value={renSort} onChange={e=>setRenSort(e.target.value)}>
+              <option value="date">By date</option>
+              <option value="profit">By profit</option>
+              <option value="billing">By billing</option>
+              <option value="client">By client</option>
+            </select>
+          </div>
           {/* Tabs */}
           <div style={{display:"flex",gap:8,marginBottom:14,paddingBottom:12,borderBottom:"1px solid #1e1e2e"}}>
-            {[["active","Active"],["done","Done ✓"]].map(([k,lbl])=>(
+            {[["active","Active"],["done","Done ✓"],["archived","🗄 Archive"]].map(([k,lbl])=>(
               <button key={k} onClick={()=>setRenTab(k)} style={{padding:"7px 18px",borderRadius:8,fontSize:13,fontWeight:600,cursor:"pointer",border:"none",background:renTab===k?"var(--gold)":k==="done"&&renewals.filter(r=>r.status==="done").length>0?"#0e1a0e":"var(--bg2)",color:renTab===k?"#0d0d10":k==="done"&&renewals.filter(r=>r.status==="done").length>0?"var(--green)":"var(--text3)"}}>
-                {lbl}{k==="done"&&renewals.filter(r=>r.status==="done").length>0?` (${renewals.filter(r=>r.status==="done").length})`:""}
+  {lbl}{k==="done"&&renewals.filter(r=>r.status==="done").length>0?` (${renewals.filter(r=>r.status==="done").length})`:""}{k==="archived"&&renewals.filter(r=>r.status==="archived").length>0?` (${renewals.filter(r=>r.status==="archived").length})`:""}
               </button>
             ))}
           </div>
           <div className="renewals-grid">
             {renewals
-              .filter(r=>renTab==="active"?r.status!=="done":r.status==="done")
-              .sort((a,b)=>a.renewalDate.localeCompare(b.renewalDate))
+              .filter(r=>{
+                const q=searchQ.toLowerCase();
+                if(q&&!r.service.toLowerCase().includes(q)&&!(clients.find(c=>c.id===r.clientId)?.name||"").toLowerCase().includes(q))return false;
+                if(renTab==="active")return r.status!=="done"&&r.status!=="archived";
+                if(renTab==="done")return r.status==="done";
+                return r.status==="archived";
+              })
+              .sort((a,b)=>{
+                if(renSort==="profit")return (b.billingAmount-b.cost)-(a.billingAmount-a.cost);
+                if(renSort==="billing")return b.billingAmount-a.billingAmount;
+                if(renSort==="client"){const ca=clients.find(c=>c.id===a.clientId)?.name||"";const cb=clients.find(c=>c.id===b.clientId)?.name||"";return ca.localeCompare(cb);}
+                return a.renewalDate.localeCompare(b.renewalDate);
+              })
               .map(r=>{
                 const cl=clients.find(c=>c.id===r.clientId);
                 const d=daysUntil(r.renewalDate);
@@ -609,7 +716,13 @@ function App(){
                     {done&&(
                       <div style={{display:"flex",gap:6}}>
                         <button className="btn btn-ghost btn-sm" style={{flex:1,color:"var(--text3)"}} onClick={()=>unmarkRenDone(r.id)}>↩ Restore</button>
-                        <button className="btn btn-ghost btn-sm" style={{padding:"7px 10px",color:"#ff6868"}} onClick={()=>deleteRenewal(r.id)}>🗑</button>
+                        <button className="btn btn-ghost btn-sm" style={{padding:"7px 10px",color:"#888",fontSize:11}} onClick={()=>archiveRenewal(r.id)}>🗄 Archive</button>
+                      </div>
+                    )}
+                    {r.status==="archived"&&(
+                      <div style={{display:"flex",gap:6}}>
+                        <button className="btn btn-ghost btn-sm" style={{flex:1,color:"var(--text3)"}} onClick={()=>unmarkRenDone(r.id)}>↩ Restore</button>
+                        <button className="btn btn-ghost btn-sm" style={{padding:"7px 10px",color:"#ff6868"}} onClick={()=>deleteRenewal(r.id)}>🗑 Delete</button>
                       </div>
                     )}
                   </div>
@@ -617,7 +730,7 @@ function App(){
               })}
             {renewals.filter(r=>renTab==="active"?r.status!=="done":r.status==="done").length===0&&(
               <div style={{gridColumn:"1/-1",textAlign:"center",padding:"40px 0",color:"var(--text3)",fontSize:14}}>
-                {renTab==="active"?"No active renewals — tap + Add to create one":"No completed renewals yet"}
+  {renTab==="active"?"No active renewals — tap + Add to create one":renTab==="done"?"No completed renewals yet":"Archive is empty"}
               </div>
             )}
           </div>
@@ -625,19 +738,22 @@ function App(){
       )}
 
       {/* ═══ CLIENTS ═══ */}
-      {view==="clients"&&(
+      {view==="clients"&&!clientDetail&&(
         <div>
           <div className="page-header">
             <h1 className="page-title">Clients</h1>
             <button className="btn btn-gold btn-sm" onClick={()=>setShowAddClient(true)}>+ Add</button>
           </div>
+          <div style={{marginBottom:12}}>
+            <input className="input" style={{fontSize:13}} placeholder="Search clients…" value={searchQ} onChange={e=>setSearchQ(e.target.value)}/>
+          </div>
           <div className="clients-grid">
-            {clients.map(c=>{
+            {clients.filter(c=>!searchQ||c.name.toLowerCase().includes(searchQ.toLowerCase())||c.email.toLowerCase().includes(searchQ.toLowerCase())).map(c=>{
               const cT=tasks.filter(t=>t.clientId===c.id&&!t.done);
               const cR=renewals.filter(r=>r.clientId===c.id&&r.status!=="done");
               const tot=renewals.filter(r=>r.clientId===c.id).reduce((a,r)=>a+r.billingAmount,0);
               return(
-                <div key={c.id} className="card" style={{marginBottom:0}}>
+                <div key={c.id} className="card" style={{marginBottom:0,cursor:"pointer"}} onClick={()=>setClientDetail(c)}>
                   <div style={{display:"flex",alignItems:"center",gap:11,marginBottom:12}}>
                     <div style={{width:42,height:42,borderRadius:12,background:c.type==="tax"?"#2a1f06":"#061a2a",display:"flex",alignItems:"center",justifyContent:"center",fontSize:20}}>{c.type==="tax"?"📋":"🌐"}</div>
                     <div style={{flex:1,minWidth:0}}>
@@ -650,7 +766,7 @@ function App(){
                     <div style={{background:"#08080d",borderRadius:8,padding:"8px 10px"}}><div className="lbl">Renewals</div><div style={{fontWeight:700,color:"var(--blue)"}}>{cR.length}</div></div>
                     <div style={{background:"#08080d",borderRadius:8,padding:"8px 10px"}}><div className="lbl">Billed</div><div style={{fontWeight:700,color:"var(--green)",fontSize:12}}>RM {tot}</div></div>
                   </div>
-                  <div style={{display:"flex",gap:7}}>
+                  <div style={{display:"flex",gap:7}} onClick={e=>e.stopPropagation()}>
                     <button className="btn btn-ai btn-sm" style={{flex:2}} onClick={()=>{openAI("email",null);setEmailCtx({clientId:c.id,purpose:""});}}>✦ Email</button>
                     <button className="btn btn-ghost btn-sm" style={{flex:1}} onClick={()=>setEditClient(c)}>✏️ Edit</button>
                     <button className="btn btn-red btn-sm" style={{flex:1,padding:"7px 8px"}} onClick={()=>deleteClient(c.id)}>🗑</button>
@@ -661,6 +777,74 @@ function App(){
           </div>
         </div>
       )}
+
+      {/* CLIENT DETAIL PAGE */}
+      {view==="clients"&&clientDetail&&(()=>{
+        const c=clientDetail;
+        const cTasks=tasks.filter(t=>t.clientId===c.id);
+        const cRens=renewals.filter(r=>r.clientId===c.id);
+        const totalBilled=cRens.reduce((a,r)=>a+r.billingAmount,0);
+        const totalProfit=cRens.reduce((a,r)=>a+(r.billingAmount-r.cost),0);
+        return(
+          <div>
+            <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:16}}>
+              <button className="btn btn-ghost btn-sm" onClick={()=>setClientDetail(null)}>← Back</button>
+              <h1 className="page-title" style={{margin:0,flex:1}}>{c.name}</h1>
+              <button className="btn btn-ghost btn-sm" onClick={()=>setEditClient(c)}>✏️</button>
+            </div>
+            {/* Client info card */}
+            <div className="card" style={{marginBottom:12}}>
+              <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:12}}>
+                <div style={{width:48,height:48,borderRadius:14,background:c.type==="tax"?"#2a1f06":"#061a2a",display:"flex",alignItems:"center",justifyContent:"center",fontSize:24}}>{c.type==="tax"?"📋":"🌐"}</div>
+                <div>
+                  <div style={{fontWeight:700,fontSize:17}}>{c.name}</div>
+                  <div style={{fontSize:13,color:"var(--text3)"}}>{c.email||"No email"}</div>
+                  <div style={{fontSize:11,color:c.type==="tax"?"#e8a838":"#38c3e8",marginTop:2}}>{c.type==="tax"?"Tax Client":"Web Client"}</div>
+                </div>
+              </div>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+                <div style={{background:"#08080d",borderRadius:8,padding:"10px 12px"}}>
+                  <div style={{fontSize:11,color:"var(--text3)"}}>Total Billed</div>
+                  <div style={{fontSize:18,fontWeight:700,color:"var(--green)"}}>RM {totalBilled}</div>
+                </div>
+                <div style={{background:"#08080d",borderRadius:8,padding:"10px 12px"}}>
+                  <div style={{fontSize:11,color:"var(--text3)"}}>Total Profit</div>
+                  <div style={{fontSize:18,fontWeight:700,color:"var(--gold)"}}>RM {totalProfit}</div>
+                </div>
+              </div>
+              <button className="btn btn-ai btn-full" style={{marginTop:10}} onClick={()=>{openAI("email",null);setEmailCtx({clientId:c.id,purpose:""});}}>✦ Draft Email</button>
+            </div>
+            {/* Tasks */}
+            <div style={{marginBottom:16}}>
+              <div className="sec-head" style={{marginBottom:8}}><div className="sec-bar" style={{background:"var(--gold)"}}/><span className="sec-title">Tasks ({cTasks.filter(t=>!t.done).length} active)</span></div>
+              {cTasks.length===0?<div style={{color:"var(--text3)",fontSize:13,padding:"8px 0"}}>No tasks for this client.</div>
+              :cTasks.sort((a,b)=>a.dueDate.localeCompare(b.dueDate)).map(t=><TaskRow key={t.id} task={t} clients={clients} onToggle={toggleDone} onDelete={deleteTask} onEdit={setEditTask}/>)}
+            </div>
+            {/* Renewals */}
+            <div>
+              <div className="sec-head" style={{marginBottom:8}}><div className="sec-bar" style={{background:"var(--blue)"}}/><span className="sec-title">Renewals ({cRens.filter(r=>r.status!=="done").length} active)</span></div>
+              {cRens.length===0?<div style={{color:"var(--text3)",fontSize:13,padding:"8px 0"}}>No renewals for this client.</div>
+              :cRens.sort((a,b)=>a.renewalDate.localeCompare(b.renewalDate)).map(r=>{
+                const d=daysUntil(r.renewalDate);const dl=dayLabel(d);const done=r.status==="done";
+                return(
+                  <div key={r.id} className="card" style={{opacity:done?.5:1,marginBottom:8}}>
+                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:8}}>
+                      <div style={{fontWeight:600,fontSize:14,textDecoration:done?"line-through":"none"}}>{r.service}</div>
+                      <span style={{fontSize:12,fontWeight:700,color:done?"var(--green)":dl.color}}>{done?"✓ Done":dl.text}</span>
+                    </div>
+                    <div className="ren-cols">
+                      {[["Cost",`RM ${r.cost}`,"#ff7070"],["Billing",`RM ${r.billingAmount}`,"var(--green)"],["Profit",`RM ${r.billingAmount-r.cost}`,"var(--gold)"]].map(([l,v,c])=>(
+                        <div key={l} className="ren-col"><div className="lbl">{l}</div><div style={{fontWeight:700,color:done?"#555":c,fontSize:13}}>{v}</div></div>
+                      ))}
+                    </div>
+                    <div style={{fontSize:12,color:"var(--text3)",marginTop:6}}>📅 {fmtDateFull(r.renewalDate)}{r.notes?` · ${r.notes}`:""}</div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })()}
 
       {/* ═══ WORKFLOW ═══ */}
       {view==="workflow"&&(
@@ -705,6 +889,75 @@ function App(){
           })}
         </div>
       )}
+
+      {/* ═══ SETTINGS ═══ */}
+      {view==="settings"&&(
+        <div>
+          <div className="page-header">
+            <h1 className="page-title">⚙️ Settings</h1>
+          </div>
+          {/* Profile */}
+          <div className="card" style={{marginBottom:12}}>
+            <div style={{fontSize:13,fontWeight:700,color:"var(--gold)",marginBottom:12}}>👤 Profile</div>
+            <div style={{display:"flex",flexDirection:"column",gap:10}}>
+              <div><div className="lbl">Your Name</div><input className="input" value={settings.name} onChange={e=>setSettings(s=>({...s,name:e.target.value}))} placeholder="e.g. Ahmad"/></div>
+              <div><div className="lbl">Company Name</div><input className="input" value={settings.company} onChange={e=>setSettings(s=>({...s,company:e.target.value}))} placeholder="e.g. AZ Accounting & Web"/></div>
+              <div><div className="lbl">Currency</div>
+                <select className="select" value={settings.currency} onChange={e=>setSettings(s=>({...s,currency:e.target.value}))}>
+                  <option value="RM">RM — Malaysian Ringgit</option>
+                  <option value="USD">USD — US Dollar</option>
+                  <option value="SGD">SGD — Singapore Dollar</option>
+                  <option value="GBP">GBP — British Pound</option>
+                </select>
+              </div>
+            </div>
+          </div>
+          {/* Appearance */}
+          <div className="card" style={{marginBottom:12}}>
+            <div style={{fontSize:13,fontWeight:700,color:"var(--gold)",marginBottom:12}}>🎨 Appearance</div>
+            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"4px 0"}}>
+              <div>
+                <div style={{fontSize:14,fontWeight:600}}>Dark Mode</div>
+                <div style={{fontSize:12,color:"var(--text3)"}}>Dark background (default)</div>
+              </div>
+              <div onClick={()=>setDarkMode(d=>!d)} style={{width:46,height:26,borderRadius:13,background:darkMode?"var(--green)":"var(--border)",cursor:"pointer",position:"relative",transition:"background .2s",flexShrink:0}}>
+                <div style={{position:"absolute",top:3,left:darkMode?22:3,width:20,height:20,borderRadius:10,background:"#fff",transition:"left .2s"}}/>
+              </div>
+            </div>
+          </div>
+          {/* Notifications */}
+          <div className="card" style={{marginBottom:12}}>
+            <div style={{fontSize:13,fontWeight:700,color:"var(--gold)",marginBottom:12}}>🔔 Notifications</div>
+            <div style={{fontSize:13,color:"var(--text3)",marginBottom:10,lineHeight:1.5}}>Enable push notifications to get renewal reminders 7 days before expiry and a daily briefing at 9am.</div>
+            <button className="btn btn-gold btn-full" onClick={()=>{
+              if(!("Notification" in window)){alert("Notifications not supported on this browser.");return;}
+              Notification.requestPermission().then(p=>{
+                setNotifGranted(p==="granted");
+                if(p==="granted"){
+                  new Notification("WorkDesk",{body:"Notifications enabled! You'll get renewal reminders and daily briefings.",icon:"/workdesk/icons/icon-192.png"});
+                }else{
+                  alert("Please enable notifications in your browser/app settings.");
+                }
+              });
+            }}>{notifGranted?"✓ Notifications Enabled":"Enable Notifications"}</button>
+          </div>
+          {/* Data */}
+          <div className="card" style={{marginBottom:12}}>
+            <div style={{fontSize:13,fontWeight:700,color:"var(--gold)",marginBottom:12}}>💾 Data</div>
+            <div style={{fontSize:13,color:"var(--text3)",marginBottom:10}}>All your data is saved locally on this device. Nothing is sent to any server.</div>
+            <button className="btn btn-ghost btn-full" style={{color:"#ff6868",borderColor:"#2e1a1a"}} onClick={()=>{
+              if(window.confirm("Clear ALL data? This cannot be undone.")){
+                localStorage.clear();window.location.reload();
+              }
+            }}>🗑 Clear All Data</button>
+          </div>
+          {/* About */}
+          <div className="card">
+            <div style={{fontSize:13,fontWeight:700,color:"var(--gold)",marginBottom:8}}>ℹ️ About</div>
+            <div style={{fontSize:12,color:"var(--text3)",lineHeight:1.6}}>WorkDesk v1.0 · Built for Malaysian freelancers & consultants · AI powered by Claude (Anthropic)</div>
+          </div>
+        </div>
+      )}
     </div>
   );
 
@@ -713,8 +966,26 @@ function App(){
   const statusColor = isLunch?"#ffb547":isOffice?"var(--green)":"var(--text3)";
   const statusLabel = isLunch?"🍽 Lunch":isOffice?"🏢 In Office":"🌙 Off Hours";
 
+  const lightVars = `
+    --bg:#f0f0f8; --bg2:#e8e8f0; --bg3:#e0e0e8;
+    --border:#d0d0e0; --border2:#c8c8d8;
+    --gold:#a07010; --gold-dim:#806010;
+    --text:#1a1a2e; --text2:#444466; --text3:#888899;
+    --red:#cc2222; --green:#227722; --blue:#1a6688;
+    --ai:#5848b8; --ai-light:#6858c8;
+    --radius:12px; --radius-lg:16px;
+  `;
+
   return(
-    <div className="app">
+    <div className="app" style={darkMode?{}:{
+      "--bg":"#f4f4fb","--bg2":"#eaeaf4","--bg3":"#e0e0ec",
+      "--border":"#d0d0e0","--border2":"#c0c0d4",
+      "--gold":"#9a6e00","--gold-dim":"#7a5200",
+      "--text":"#1a1828","--text2":"#44445a","--text3":"#888898",
+      "--red":"#cc2222","--green":"#1a6e1a","--blue":"#1a5a7a",
+      background: darkMode?"#09090e":"#f4f4fb",
+      color: darkMode?"#ddd8f4":"#1a1828"
+    }}>
       <style>{CSS}</style>
 
       {/* ══ DESKTOP LAYOUT ══ */}
@@ -778,12 +1049,16 @@ function App(){
       </div>
 
       <nav className="bottom-nav">
-        {NAV_ITEMS.map(n=>(
-          <button key={n.key} className={`tab-btn${view===n.key?" active":""}`} onClick={()=>changeView(n.key)}>
-            <span className="tab-icon">{n.icon}</span>
-            <span className="tab-label">{n.label}</span>
-          </button>
-        ))}
+        {NAV_ITEMS.map(n=>{
+          const badge=n.key==="tasks"?overdueTasks.length:n.key==="renewals"?urgentRenewals.filter(r=>daysUntil(r.renewalDate)<=7).length:0;
+          return(
+            <button key={n.key} className={`tab-btn${view===n.key?" active":""}`} onClick={()=>changeView(n.key)} style={{position:"relative"}}>
+              <span className="tab-icon">{n.icon}</span>
+              {badge>0&&<span style={{position:"absolute",top:6,right:"50%",transform:"translateX(14px)",background:"var(--red)",color:"#fff",borderRadius:8,fontSize:9,fontWeight:700,padding:"1px 5px",minWidth:16,textAlign:"center"}}>{badge}</span>}
+              <span className="tab-label">{n.label}</span>
+            </button>
+          );
+        })}
       </nav>
 
       {/* FAB — mobile only */}
@@ -900,8 +1175,36 @@ function TaskRow({task,clients,onToggle,onDelete,onEdit}){
   const d=daysUntil(task.dueDate);
   const dl=dayLabel(d);
   const cl=clients.find(c=>c.id===task.clientId);
+  const [swipeX,setSwipeX]=React.useState(0);
+  const [swiping,setSwiping]=React.useState(false);
+  const startXRef=React.useRef(0);
+  const handleTouchStart=e=>{startXRef.current=e.touches[0].clientX;setSwiping(true);};
+  const handleTouchMove=e=>{
+    const dx=e.touches[0].clientX-startXRef.current;
+    setSwipeX(Math.max(-90,Math.min(90,dx)));
+  };
+  const handleTouchEnd=()=>{
+    if(swipeX<-60){onDelete(task.id);}
+    else if(swipeX>60){onToggle(task.id);}
+    setSwipeX(0);setSwiping(false);
+  };
+  const showLeft=swipeX>20;
+  const showRight=swipeX<-20;
   return(
-    <div className="card-sm" style={{display:"flex",alignItems:"flex-start",gap:10,opacity:task.done?.4:1}}>
+    <div style={{position:"relative",overflow:"hidden",borderRadius:12,marginBottom:8}}>
+      {/* Swipe hints */}
+      <div style={{position:"absolute",inset:0,borderRadius:12,background:showLeft?"#0e2e0e":showRight?"#2e0e0e":"transparent",display:"flex",alignItems:"center",justifyContent:showLeft?"flex-start":showRight?"flex-end":"center",padding:"0 18px",transition:"background .1s",pointerEvents:"none"}}>
+        {showLeft&&<span style={{fontSize:18,color:"var(--green)",fontWeight:700}}>✓</span>}
+        {showRight&&<span style={{fontSize:18,color:"var(--red)",fontWeight:700}}>✕</span>}
+      </div>
+      <div
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+        style={{transform:`translateX(${swipeX}px)`,transition:swiping?"none":"transform .2s ease"}}
+        className="card-sm"
+      >
+      <div style={{display:"flex",alignItems:"flex-start",gap:10,opacity:task.done?.4:1}}>
       <div className={`cb${task.done?" on":""}`} style={{marginTop:2}} onClick={()=>onToggle(task.id)}>
         {task.done&&<span style={{fontSize:10,color:"#0d0d10",fontWeight:900}}>✓</span>}
       </div>
