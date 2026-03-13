@@ -966,15 +966,6 @@ const activeRens=renewals.filter(r=>r.status!=="done"&&r.status!=="archived");
   const statusColor = isLunch?"#ffb547":isOffice?"var(--green)":"var(--text3)";
   const statusLabel = isLunch?"🍽 Lunch":isOffice?"🏢 In Office":"🌙 Off Hours";
 
-  const lightVars = `
-    --bg:#f0f0f8; --bg2:#e8e8f0; --bg3:#e0e0e8;
-    --border:#d0d0e0; --border2:#c8c8d8;
-    --gold:#a07010; --gold-dim:#806010;
-    --text:#1a1a2e; --text2:#444466; --text3:#888899;
-    --red:#cc2222; --green:#227722; --blue:#1a6688;
-    --ai:#5848b8; --ai-light:#6858c8;
-    --radius:12px; --radius-lg:16px;
-  `;
 
   return(
     <div className="app" style={darkMode?{}:{
@@ -1224,6 +1215,8 @@ function TaskRow({task,clients,onToggle,onDelete,onEdit}){
         <button className="btn btn-ghost btn-sm" style={{padding:"5px 8px",fontSize:12}} onClick={()=>onEdit(task)}>✏️</button>
         <button className="btn btn-red btn-sm" style={{padding:"5px 8px",fontSize:12}} onClick={()=>onDelete(task.id)}>✕</button>
       </div>
+    </div>
+    </div>
     </div>
   );
 }
