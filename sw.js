@@ -1,7 +1,7 @@
 // WorkDesk Service Worker v3.0
 // Caches everything for full offline support
 
-const CACHE_NAME = "workdesk-v3";
+const CACHE_NAME = "workdesk-v6";
 const ASSETS = [
   "./",
   "./index.html",
@@ -81,12 +81,19 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  // For everything else (app shell, CDN scripts): cache-first strategy
+  // index.html — ALWAYS fetch from network so updates appear instantly
+  if (url.pathname.endsWith("/") || url.pathname.endsWith("index.html")) {
+    event.respondWith(
+      fetch(event.request).catch(() => caches.match(event.request))
+    );
+    return;
+  }
+
+  // Everything else (icons, manifest, CDN): cache-first
   event.respondWith(
     caches.match(event.request).then((cached) => {
       if (cached) return cached;
       return fetch(event.request).then((response) => {
-        // Cache valid responses for future offline use
         if (response && response.status === 200 && response.type !== "opaque") {
           const responseClone = response.clone();
           caches.open(CACHE_NAME).then((cache) => {
