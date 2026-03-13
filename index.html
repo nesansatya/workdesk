@@ -976,19 +976,16 @@ function ClientModal({onClose,onSave,isEdit,client}){
 }
 
 // SW registration
-// ── Block pull-to-refresh, smooth scrolling ────────────────────────────────
+// ── Block pull-to-refresh only ─────────────────────────────────────────────
 (function() {
-  let startY        = 0;
+  let startY         = 0;
   let startScrollTop = 0;
-  let scrollEl      = null;
-  let isScrolling   = false;   // true once user has scrolled away from top
+  let scrollEl       = null;
 
   document.addEventListener('touchstart', function(e) {
     startY         = e.touches[0].clientY;
-    isScrolling    = false;
     scrollEl       = null;
     startScrollTop = 0;
-
     let el = e.target;
     while (el && el !== document.documentElement) {
       const oy = window.getComputedStyle(el).overflowY;
@@ -1003,35 +1000,20 @@ function ClientModal({onClose,onSave,isEdit,client}){
 
   document.addEventListener('touchmove', function(e) {
     if (!scrollEl) {
-      // Not in a scrollable container — always block (no content to scroll)
       e.preventDefault();
       return;
     }
-
-    const currentY = e.touches[0].clientY;
-    const dy       = currentY - startY;   // positive = finger moving down
-
-    // Once we've scrolled past the top, mark as active scroll session
-    if (scrollEl.scrollTop > 0) {
-      isScrolling = true;
+    // ONLY block when touch started at the very top AND still at top
+    // Use startScrollTop — NOT current scrollTop — so we never block mid-scroll
+    if (startScrollTop <= 0 && scrollEl.scrollTop <= 0) {
+      const dy = e.touches[0].clientY - startY;
+      if (dy > 5) {
+        // Deliberate downward pull from top = pull-to-refresh, block it
+        e.preventDefault();
+      }
     }
-
-    // If we are mid-scroll session, NEVER block — let native handle it
-    if (isScrolling) {
-      return;
-    }
-
-    // Only block the very first downward pull when starting at top
-    if (dy > 0 && startScrollTop <= 0 && scrollEl.scrollTop <= 0) {
-      e.preventDefault();
-    }
+    // Everything else: let the browser handle naturally
   }, { passive: false });
-
-  document.addEventListener('touchend', function() {
-    isScrolling    = false;
-    scrollEl       = null;
-    startScrollTop = 0;
-  }, { passive: true });
 })();
 
 if("serviceWorker" in navigator){
