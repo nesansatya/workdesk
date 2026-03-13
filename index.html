@@ -363,7 +363,7 @@ function App(){
   const changeView = v => { setView(v); localStorage.setItem("wd_view", v); };
   const [now,        setNow]        = useState(new Date());
   const [filterCat,  setFilterCat]  = useState("all");
-  const [isOnline,   setIsOnline]   = useState(navigator.onLine);
+  const [isOnline,   setIsOnline]   = useState(true); // assume online, let API call fail naturally
   const [showAddTask,    setShowAddTask]    = useState(false);
   const [showAddRenewal, setShowAddRenewal] = useState(false);
   const [editRenewal, setEditRenewal] = useState(null);
@@ -477,7 +477,7 @@ function App(){
   // AI actions
   const sendChat=async()=>{
     if(!chatInput.trim()||aiLoading)return;
-    if(!isOnline){setChatHistory(h=>[...h,{role:"user",content:chatInput},{role:"assistant",content:"⚠️ You're offline. AI needs internet."}]);setChatInput("");return;}
+
     const userMsg={role:"user",content:chatInput.trim()};
     const newHist=[...chatHistory,userMsg];
     setChatHistory(newHist);setChatInput("");setAiLoading(true);
@@ -486,21 +486,18 @@ function App(){
     setAiLoading(false);
   };
   const genBriefing=async()=>{
-    if(!isOnline){setBriefing("⚠️ Offline.");return;}
     setAiLoading(true);setBriefing("");
     try{const r=await callClaude([{role:"user",content:`Generate my personalised daily briefing for today (${today}). Priority actions, overdue items, renewals, time-blocked schedule 9am–6pm (skip 1–2pm lunch).`}],sys);setBriefing(r);}
     catch{setBriefing("Failed. Try again.");}setAiLoading(false);
   };
   const genEmail=async()=>{
     if(!emailCtx.clientId||!emailCtx.purpose)return;
-    if(!isOnline){setEmailDraft("⚠️ Offline.");return;}
     const cl=clients.find(c=>c.id===emailCtx.clientId);
     setAiLoading(true);setEmailDraft("");
     try{const r=await callClaude([{role:"user",content:`Draft a professional email to ${cl.name} (${cl.email}) for: "${emailCtx.purpose}". Match my communication style. Include subject line.`}],sys);setEmailDraft(r);}
     catch{setEmailDraft("Connection error.");}setAiLoading(false);
   };
   const genSuggestions=async()=>{
-    if(!isOnline)return;
     setAiLoading(true);setSuggestions([]);
     try{const r=await callClaude([{role:"user",content:`Suggest 5 tasks based on my workflow routines. Return ONLY JSON array: [{"title":"...","category":"tax|web|social|billing|admin","priority":"high|medium|low","dueDate":"YYYY-MM-DD","notes":"...","reason":"..."}]. Today is ${today}.`}],sys);
       setSuggestions(JSON.parse(r.replace(/```json|```/g,"").trim()));}
@@ -1028,7 +1025,7 @@ const activeRens=renewals.filter(r=>r.status!=="done"&&r.status!=="archived");
         </div>
         <div style={{display:"flex",alignItems:"center",gap:7}}>
           <span style={{fontSize:11,color:statusColor,background:"#111",border:"1px solid #1a1a22",padding:"3px 8px",borderRadius:10,fontWeight:600}}>{statusLabel} {timeStr}</span>
-          <button className="btn btn-ai" style={{padding:"6px 11px",fontSize:12,opacity:isOnline?1:.5}} onClick={()=>setAiOpen(o=>!o)}>✦ AI</button>
+          <button className="btn btn-ai" style={{padding:"6px 11px",fontSize:12}} onClick={()=>setAiOpen(o=>!o)}>✦ AI</button>
         </div>
       </div>
 
@@ -1106,7 +1103,7 @@ const activeRens=renewals.filter(r=>r.status!=="done"&&r.status!=="archived");
               {aiTab==="briefing"&&(
                 <div style={{flex:1,overflowY:"auto",padding:"14px",display:"flex",flexDirection:"column",gap:10}}>
                   <p style={{fontSize:13,color:"#666",lineHeight:1.55}}>AI generates a personalised daily briefing based on your workflow and current tasks.</p>
-                  <button className="btn btn-gold btn-full" onClick={genBriefing} disabled={aiLoading||!isOnline}>{aiLoading?"Generating…":!isOnline?"Offline":"📋 Generate Daily Briefing"}</button>
+                  <button className="btn btn-gold btn-full" onClick={genBriefing} disabled={aiLoading}>{aiLoading?"Generating…":"📋 Generate Daily Briefing"}</button>
                   {aiLoading&&!briefing&&<div style={{display:"flex",gap:5,justifyContent:"center",padding:16}}><span className="typing-dot"/><span className="typing-dot"/><span className="typing-dot"/></div>}
                   {briefing&&<div className="ai-bubble assistant">{briefing}</div>}
                 </div>
@@ -1123,14 +1120,14 @@ const activeRens=renewals.filter(r=>r.status!=="done"&&r.status!=="archived");
                   <div><div className="lbl">Purpose</div>
                     <textarea className="input" placeholder="e.g. Renewal invoice for GoDaddy RM280 due April 15" value={emailCtx.purpose} onChange={e=>setEmailCtx(x=>({...x,purpose:e.target.value}))}/>
                   </div>
-                  <button className="btn btn-gold btn-full" onClick={genEmail} disabled={aiLoading||!emailCtx.clientId||!emailCtx.purpose||!isOnline}>{aiLoading?"Drafting…":!isOnline?"Offline":"✦ Draft with AI"}</button>
+                  <button className="btn btn-gold btn-full" onClick={genEmail} disabled={aiLoading||!emailCtx.clientId||!emailCtx.purpose}>{aiLoading?"Drafting…":"✦ Draft with AI"}</button>
                   {emailDraft&&<><div className="ai-bubble assistant">{emailDraft}</div><button className="btn btn-ghost btn-full" onClick={()=>navigator.clipboard?.writeText(emailDraft)}>📋 Copy</button></>}
                 </div>
               )}
               {aiTab==="suggest"&&(
                 <div style={{flex:1,overflowY:"auto",padding:"14px",display:"flex",flexDirection:"column",gap:10}}>
                   <p style={{fontSize:13,color:"#666",lineHeight:1.5}}>AI suggests tasks based on your routines.</p>
-                  <button className="btn btn-gold btn-full" onClick={genSuggestions} disabled={aiLoading||!isOnline}>{aiLoading?"Analysing…":!isOnline?"Offline":"💡 Suggest Tasks"}</button>
+                  <button className="btn btn-gold btn-full" onClick={genSuggestions} disabled={aiLoading}>{aiLoading?"Analysing…":"💡 Suggest Tasks"}</button>
                   {suggestions.map((s,i)=>{
                     const cat=CATEGORIES[s.category]||CATEGORIES.admin;
                     const pri=PRIORITIES[s.priority]||PRIORITIES.medium;
